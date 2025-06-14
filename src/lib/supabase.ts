@@ -1,0 +1,156 @@
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables')
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+export type UserType = 'regular' | 'promoter'
+
+export interface UserProfile {
+  id: string
+  email: string
+  user_type: UserType
+  age_group: string
+  city: string
+  country: string
+  zip_code: string
+  income_group: string
+  preferred_categories: string[]
+  shopping_frequency: string
+  price_sensitivity: 'Budget' | 'Mid-range' | 'Premium'
+  created_at: string
+  updated_at: string
+}
+
+export interface Deal {
+  id: string
+  title: string
+  description: string
+  coupon_code?: string
+  retail_price: number
+  current_price: number
+  discount_percentage: number
+  category: string
+  marketplace: string
+  promoter_id: string
+  affiliate_link: string
+  expiry_date: string
+  image_url?: string
+  view_count?: number
+  click_count?: number
+  save_count?: number
+  created_at: string
+  updated_at: string
+  promoter?: UserProfile
+  interactions?: DealInteraction[]
+  comments?: DealComment[]
+  share_count?: number
+  helpful_count?: number
+  not_helpful_count?: number
+  user_interaction?: DealInteraction
+  user_saved?: boolean
+}
+
+export interface DealInteraction {
+  id: string
+  deal_id: string
+  user_id: string
+  is_helpful?: boolean
+  has_used: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface DealComment {
+  id: string
+  deal_id: string
+  user_id: string
+  comment: string
+  created_at: string
+  updated_at: string
+  user?: UserProfile
+}
+
+export interface DealShare {
+  id: string
+  deal_id: string
+  user_id: string
+  platform: string
+  created_at: string
+}
+
+export interface DealSave {
+  id: string
+  deal_id: string
+  user_id: string
+  created_at: string
+}
+
+export interface DealAnalytics {
+  id: string
+  deal_id: string
+  user_id?: string
+  session_id?: string
+  event_type: 'view' | 'click' | 'share'
+  created_at: string
+  user_agent?: string
+  ip_address?: string
+}
+
+export interface PromoterStats {
+  total_deals: number
+  deals_last_7_days: number
+  total_clicks: number
+  total_views: number
+  total_saves: number
+  total_shares: number
+  conversion_rate: number
+  change_vs_previous_week: {
+    deals: number
+    clicks: number
+    views: number
+    saves: number
+    shares: number
+  }
+}
+
+// Helper function to track deal analytics
+export const trackDealEvent = async (
+  dealId: string,
+  eventType: 'view' | 'click' | 'share',
+  userId?: string
+) => {
+  try {
+    const sessionId = !userId ? getSessionId() : null
+    
+    await supabase.from('deal_analytics').insert({
+      deal_id: dealId,
+      user_id: userId || null,
+      session_id: sessionId,
+      event_type: eventType,
+      user_agent: navigator.userAgent
+    })
+  } catch (error) {
+    console.error('Error tracking deal event:', error)
+  }
+}
+
+// Helper function to generate session ID for anonymous users
+export const generateSessionId = (): string => {
+  return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+}
+
+// Helper function to get or create session ID
+export const getSessionId = (): string => {
+  let sessionId = sessionStorage.getItem('jadedeals_session_id')
+  if (!sessionId) {
+    sessionId = generateSessionId()
+    sessionStorage.setItem('jadedeals_session_id', sessionId)
+  }
+  return sessionId
+}
