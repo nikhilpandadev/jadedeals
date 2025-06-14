@@ -15,8 +15,10 @@ const BrowseDeals: React.FC = () => {
   // Configuration for free deals limit
   const FREE_DEALS_LIMIT = 10
 
-  // Get category from URL params
-  const categoryFromUrl = searchParams.get('category')
+  // Get filters from URL params
+  const searchTerm = searchParams.get('search') || ''
+  const categoryFromUrl = searchParams.get('category') || ''
+  const timeFilter = searchParams.get('time') || ''
 
   // Redirect promoters away from this page
   useEffect(() => {
@@ -31,29 +33,65 @@ const BrowseDeals: React.FC = () => {
     if (profile?.user_type !== 'promoter') {
       fetchDeals()
     }
-  }, [categoryFromUrl, profile])
+  }, [searchTerm, categoryFromUrl, timeFilter, profile])
 
   const fetchDeals = async () => {
     try {
       setLoading(true)
       
+      // Calculate time filter date
+      let timeFilterDate = null
+      if (timeFilter) {
+        const now = new Date()
+        switch (timeFilter) {
+          case '24h':
+            timeFilterDate = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+            break
+          case '72h':
+            timeFilterDate = new Date(now.getTime() - 72 * 60 * 60 * 1000)
+            break
+          case '7d':
+            timeFilterDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+            break
+        }
+      }
+
       // First, try to get unexpired deals
       let unexpiredQuery = supabase
         .from('deals')
         .select(`
           *,
           interactions:deal_interactions(is_helpful, has_used),
-          comments:deal_comments(id)
+          comments:deal_comments(id),
+          user_interaction:deal_interactions!left(is_helpful, has_used),
+          user_saved:deal_saves!left(id)
         `)
         .gt('expiry_date', new Date().toISOString()) // Only unexpired deals
-        .order('created_at', { ascending: false })
 
-      // Apply category filter if present
+      // Filter user interactions for the current user
+      if (user?.id) {
+        unexpiredQuery = unexpiredQuery.eq('user_interaction.user_id', user.id)
+        unexpiredQuery = unexpiredQuery.eq('user_saved.user_id', user.id)
+      }
+
+      // Apply search filter
+      if (searchTerm) {
+        unexpiredQuery = unexpiredQuery.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,marketplace.ilike.%${searchTerm}%`)
+      }
+
+      // Apply category filter
       if (categoryFromUrl) {
         unexpiredQuery = unexpiredQuery.eq('category', categoryFromUrl)
       }
 
-      const { data: unexpiredDeals, error: unexpiredError } = await unexpiredQuery.limit(20)
+      // Apply time filter
+      if (timeFilterDate) {
+        unexpiredQuery = unexpiredQuery.gte('created_at', timeFilterDate.toISOString())
+      }
+
+      unexpiredQuery = unexpiredQuery.order('created_at', { ascending: false }).limit(20)
+
+      const { data: unexpiredDeals, error: unexpiredError } = await unexpiredQuery
 
       if (unexpiredError) {
         console.error('Error fetching unexpired deals:', unexpiredError)
@@ -69,17 +107,34 @@ const BrowseDeals: React.FC = () => {
           .select(`
             *,
             interactions:deal_interactions(is_helpful, has_used),
-            comments:deal_comments(id)
+            comments:deal_comments(id),
+            user_interaction:deal_interactions!left(is_helpful, has_used),
+            user_saved:deal_saves!left(id)
           `)
           .lt('expiry_date', new Date().toISOString()) // Only expired deals
-          .order('created_at', { ascending: false })
 
-        // Apply category filter if present
+        // Filter user interactions for the current user
+        if (user?.id) {
+          expiredQuery = expiredQuery.eq('user_interaction.user_id', user.id)
+          expiredQuery = expiredQuery.eq('user_saved.user_id', user.id)
+        }
+
+        // Apply same filters
+        if (searchTerm) {
+          expiredQuery = expiredQuery.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,marketplace.ilike.%${searchTerm}%`)
+        }
+
         if (categoryFromUrl) {
           expiredQuery = expiredQuery.eq('category', categoryFromUrl)
         }
 
-        const { data: expiredDeals, error: expiredError } = await expiredQuery.limit(20 - dealsToUse.length)
+        if (timeFilterDate) {
+          expiredQuery = expiredQuery.gte('created_at', timeFilterDate.toISOString())
+        }
+
+        expiredQuery = expiredQuery.order('created_at', { ascending: false }).limit(20 - dealsToUse.length)
+
+        const { data: expiredDeals, error: expiredError } = await expiredQuery
 
         if (expiredError) {
           console.error('Error fetching expired deals:', expiredError)
@@ -111,12 +166,14 @@ const BrowseDeals: React.FC = () => {
         ...deal,
         helpful_count: deal.interactions?.filter(i => i.is_helpful === true).length || 0,
         not_helpful_count: deal.interactions?.filter(i => i.is_helpful === false).length || 0,
+        user_interaction: deal.user_interaction?.[0] || null,
+        user_saved: deal.user_saved?.length > 0,
         promoter: {
           email: promoterProfiles?.find(p => p.id === deal.promoter_id)?.email || 'Unknown'
         }
       })) || []
 
-      console.log('Processed deals:', processedDeals.length, 'Category filter:', categoryFromUrl)
+      console.log('Processed deals:', processedDeals.length, 'Filters:', { searchTerm, categoryFromUrl, timeFilter })
       setDeals(processedDeals)
     } catch (error) {
       console.error('Error fetching deals:', error)
@@ -126,9 +183,11 @@ const BrowseDeals: React.FC = () => {
     }
   }
 
-  const clearCategoryFilter = () => {
+  const clearFilters = () => {
     setSearchParams({})
   }
+
+  const hasActiveFilters = searchTerm || categoryFromUrl || timeFilter
 
   // Show access denied for promoters
   if (profile?.user_type === 'promoter') {
@@ -149,7 +208,7 @@ const BrowseDeals: React.FC = () => {
               Go to My Dashboard
             </Link>
             <Link
-              to="/promoters"
+              to="/promoter-resources"
               className="border-2 border-emerald-500 text-emerald-600 px-6 py-3 rounded-lg font-semibold hover:bg-emerald-50 transition-all duration-200 block"
             >
               Promoter Resources
@@ -181,28 +240,40 @@ const BrowseDeals: React.FC = () => {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            {categoryFromUrl ? `${categoryFromUrl} Deals` : 'Amazing Deals Await'}
+            {hasActiveFilters ? 'Search Results' : 'Amazing Deals Await'}
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            {categoryFromUrl 
-              ? `Discover exclusive ${categoryFromUrl.toLowerCase()} offers and limited-time deals`
+            {hasActiveFilters 
+              ? `Found ${deals.length} deals matching your criteria`
               : 'Discover exclusive offers and limited-time deals from trusted promoters'
             }
           </p>
           
-          {/* Category Filter Badge */}
-          {categoryFromUrl && (
-            <div className="mt-4 flex justify-center">
-              <div className="inline-flex items-center bg-emerald-100 text-emerald-800 px-4 py-2 rounded-full">
-                <span className="font-medium">Filtered by: {categoryFromUrl}</span>
-                <button
-                  onClick={clearCategoryFilter}
-                  className="ml-2 hover:bg-emerald-200 rounded-full p-1 transition-colors"
-                  aria-label="Clear category filter"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
+          {/* Active Filters */}
+          {hasActiveFilters && (
+            <div className="mt-6 flex flex-wrap justify-center gap-2">
+              {searchTerm && (
+                <div className="inline-flex items-center bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-sm">
+                  <span>Search: "{searchTerm}"</span>
+                </div>
+              )}
+              {categoryFromUrl && (
+                <div className="inline-flex items-center bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
+                  <span>Category: {categoryFromUrl}</span>
+                </div>
+              )}
+              {timeFilter && (
+                <div className="inline-flex items-center bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm">
+                  <span>Time: {timeFilter === '24h' ? 'Last 24 hours' : timeFilter === '72h' ? 'Last 72 hours' : 'Last 7 days'}</span>
+                </div>
+              )}
+              <button
+                onClick={clearFilters}
+                className="inline-flex items-center bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-sm hover:bg-gray-200 transition-colors"
+              >
+                <X className="h-3 w-3 mr-1" />
+                Clear all
+              </button>
             </div>
           )}
 
@@ -222,21 +293,21 @@ const BrowseDeals: React.FC = () => {
             <div className="max-w-md mx-auto">
               <div className="text-6xl mb-4">🔍</div>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                {categoryFromUrl ? `No ${categoryFromUrl} deals found` : 'No deals found'}
+                No deals found
               </h3>
               <p className="text-gray-600 mb-6">
-                {categoryFromUrl 
-                  ? `We don't have any ${categoryFromUrl.toLowerCase()} deals available right now. Check back later or browse other categories.`
+                {hasActiveFilters 
+                  ? 'No deals match your current search criteria. Try adjusting your filters or search terms.'
                   : 'No deals are currently available. Check back later for new offers.'
                 }
               </p>
-              {categoryFromUrl ? (
+              {hasActiveFilters ? (
                 <div className="space-y-3">
                   <button
-                    onClick={clearCategoryFilter}
+                    onClick={clearFilters}
                     className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition-all duration-200 block w-full"
                   >
-                    Browse All Deals
+                    Clear Filters & Browse All
                   </button>
                   <Link
                     to="/categories"

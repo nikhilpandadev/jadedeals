@@ -16,6 +16,7 @@ import {
 import { Deal, DealInteraction, trackDealEvent } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import ShareModal from './ShareModal'
 
 interface DealCardProps {
   deal: Deal
@@ -36,6 +37,14 @@ const DealCard: React.FC<DealCardProps> = ({
   const [hasUsedDeal, setHasUsedDeal] = useState(deal.user_interaction?.has_used || false)
   const [isSaved, setIsSaved] = useState(deal.user_saved || false)
   const [saveLoading, setSaveLoading] = useState(false)
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [helpfulState, setHelpfulState] = useState<boolean | null>(deal.user_interaction?.is_helpful ?? null)
+  const [localCounts, setLocalCounts] = useState({
+    helpful: deal.helpful_count || 0,
+    notHelpful: deal.not_helpful_count || 0,
+    saves: deal.save_count || 0,
+    shares: deal.share_count || 0
+  })
 
   const getDiscountColor = (percentage: number) => {
     if (percentage >= 50) return 'bg-red-500'
@@ -57,11 +66,31 @@ const DealCard: React.FC<DealCardProps> = ({
     return `${diffDays}d ${diffHours % 24}h left`
   }
 
-  const handleHelpfulClick = (isHelpful: boolean) => {
+  const handleHelpfulClick = async (isHelpful: boolean) => {
     if (!user || !onInteraction) return
     
-    const currentVote = deal.user_interaction?.is_helpful
-    const newVote = currentVote === isHelpful ? null : isHelpful
+    const newVote = helpfulState === isHelpful ? null : isHelpful
+    
+    // Update local state immediately for better UX
+    setHelpfulState(newVote)
+    setLocalCounts(prev => {
+      let newHelpful = prev.helpful
+      let newNotHelpful = prev.notHelpful
+      
+      // Remove previous vote
+      if (helpfulState === true) newHelpful--
+      if (helpfulState === false) newNotHelpful--
+      
+      // Add new vote
+      if (newVote === true) newHelpful++
+      if (newVote === false) newNotHelpful++
+      
+      return {
+        ...prev,
+        helpful: Math.max(0, newHelpful),
+        notHelpful: Math.max(0, newNotHelpful)
+      }
+    })
     
     onInteraction(deal.id, { is_helpful: newVote })
   }
@@ -86,6 +115,8 @@ const DealCard: React.FC<DealCardProps> = ({
           .delete()
           .eq('deal_id', deal.id)
           .eq('user_id', user.id)
+        
+        setLocalCounts(prev => ({ ...prev, saves: Math.max(0, prev.saves - 1) }))
       } else {
         // Add save
         await supabase
@@ -94,6 +125,8 @@ const DealCard: React.FC<DealCardProps> = ({
             deal_id: deal.id,
             user_id: user.id
           })
+        
+        setLocalCounts(prev => ({ ...prev, saves: prev.saves + 1 }))
       }
       setIsSaved(!isSaved)
     } catch (error) {
@@ -109,199 +142,231 @@ const DealCard: React.FC<DealCardProps> = ({
     window.open(deal.affiliate_link, '_blank', 'noopener,noreferrer')
   }
 
+  const handleShareClick = async () => {
+    setShowShareModal(true)
+    
+    // Track share event and update local count
+    if (user) {
+      try {
+        await supabase
+          .from('deal_shares')
+          .insert({
+            deal_id: deal.id,
+            user_id: user.id,
+            platform: 'web'
+          })
+        
+        await trackDealEvent(deal.id, 'share', user.id)
+        setLocalCounts(prev => ({ ...prev, shares: prev.shares + 1 }))
+      } catch (error) {
+        console.error('Error tracking share:', error)
+      }
+    }
+  }
+
   const timeRemaining = getTimeRemaining(deal.expiry_date)
   const isExpired = timeRemaining === 'Expired'
 
   return (
-    <div className={`bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition-all duration-300 ${isExpired ? 'opacity-60' : ''}`}>
-      {/* Deal Image */}
-      {deal.image_url && (
-        <div className="aspect-video w-full overflow-hidden">
-          <img
-            src={deal.image_url}
-            alt={deal.title}
-            className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-          />
-        </div>
-      )}
-
-      {/* Header */}
-      <div className="p-6 pb-4">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
-              {deal.title}
-            </h3>
-            <p className="text-gray-600 text-sm line-clamp-3 mb-3">
-              {deal.description}
-            </p>
-          </div>
-          <div className="flex items-center space-x-2 ml-4 flex-shrink-0">
-            <div className={`${getDiscountColor(deal.discount_percentage)} text-white px-3 py-1 rounded-full text-sm font-bold`}>
-              {deal.discount_percentage}% OFF
-            </div>
-            {user && (
-              <button
-                onClick={handleSaveToggle}
-                disabled={saveLoading}
-                className={`p-2 rounded-full transition-colors ${
-                  isSaved 
-                    ? 'bg-red-100 text-red-600 hover:bg-red-200' 
-                    : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-red-500'
-                }`}
-              >
-                {isSaved ? <Heart className="h-4 w-4 fill-current" /> : <Heart className="h-4 w-4" />}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Price Section */}
-        <div className="flex items-center space-x-3 mb-4">
-          <span className="text-2xl font-bold text-emerald-600">
-            ${deal.current_price.toFixed(2)}
-          </span>
-          <span className="text-lg text-gray-500 line-through">
-            ${deal.retail_price.toFixed(2)}
-          </span>
-          <span className="text-sm text-gray-600">
-            Save ${(deal.retail_price - deal.current_price).toFixed(2)}
-          </span>
-        </div>
-
-        {/* Coupon Code */}
-        {deal.coupon_code && (
-          <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-3 mb-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Coupon Code:</span>
-              <div className="flex items-center space-x-2">
-                <code className="bg-white px-2 py-1 rounded border text-sm font-mono">
-                  {deal.coupon_code}
-                </code>
-                <button
-                  onClick={() => navigator.clipboard.writeText(deal.coupon_code!)}
-                  className="text-emerald-600 hover:text-emerald-700 text-sm"
-                >
-                  Copy
-                </button>
-              </div>
-            </div>
+    <>
+      <div className={`bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition-all duration-300 ${isExpired ? 'opacity-60' : ''}`}>
+        {/* Deal Image */}
+        {deal.image_url && (
+          <div className="aspect-video w-full overflow-hidden">
+            <img
+              src={deal.image_url}
+              alt={deal.title}
+              className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+            />
           </div>
         )}
 
-        {/* Meta Information */}
-        <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-          <div className="flex items-center space-x-2 text-gray-600">
-            <Tag className="h-4 w-4" />
-            <span>{deal.category}</span>
+        {/* Header */}
+        <div className="p-6 pb-4">
+          <div className="flex items-start justify-between mb-3">
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
+                {deal.title}
+              </h3>
+              <p className="text-gray-600 text-sm line-clamp-3 mb-3">
+                {deal.description}
+              </p>
+            </div>
+            <div className="flex items-center space-x-2 ml-4 flex-shrink-0">
+              <div className={`${getDiscountColor(deal.discount_percentage)} text-white px-3 py-1 rounded-full text-sm font-bold`}>
+                {deal.discount_percentage}% OFF
+              </div>
+              {user && (
+                <button
+                  onClick={handleSaveToggle}
+                  disabled={saveLoading}
+                  className={`p-2 rounded-full transition-colors ${
+                    isSaved 
+                      ? 'bg-red-100 text-red-600 hover:bg-red-200' 
+                      : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-red-500'
+                  }`}
+                >
+                  {isSaved ? <Heart className="h-4 w-4 fill-current" /> : <Heart className="h-4 w-4" />}
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex items-center space-x-2 text-gray-600">
-            <Store className="h-4 w-4" />
-            <span>{deal.marketplace}</span>
-          </div>
-          <div className="flex items-center space-x-2 text-gray-600">
-            <User className="h-4 w-4" />
-            <span>{deal.promoter?.email?.split('@')[0] || 'Promoter'}</span>
-          </div>
-          <div className={`flex items-center space-x-2 ${isExpired ? 'text-red-600' : 'text-gray-600'}`}>
-            <Clock className="h-4 w-4" />
-            <span>{timeRemaining}</span>
-          </div>
-        </div>
 
-        {/* Action Button */}
-        <button
-          onClick={handleAffiliateClick}
-          disabled={isExpired}
-          className={`w-full py-3 px-4 rounded-lg font-semibold transition-all duration-200 flex items-center justify-center space-x-2 ${
-            isExpired 
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              : 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:shadow-lg transform hover:-translate-y-0.5'
-          }`}
-        >
-          <span>{isExpired ? 'Deal Expired' : 'Get This Deal'}</span>
-          {!isExpired && <ExternalLink className="h-4 w-4" />}
-        </button>
-      </div>
+          {/* Price Section */}
+          <div className="flex items-center space-x-3 mb-4">
+            <span className="text-2xl font-bold text-emerald-600">
+              ${deal.current_price.toFixed(2)}
+            </span>
+            <span className="text-lg text-gray-500 line-through">
+              ${deal.retail_price.toFixed(2)}
+            </span>
+            <span className="text-sm text-gray-600">
+              Save ${(deal.retail_price - deal.current_price).toFixed(2)}
+            </span>
+          </div>
 
-      {/* Interaction Section */}
-      {showFullCard && (
-        <div className="border-t border-gray-100 px-6 py-4">
-          {/* User Interaction Checkbox */}
-          {user && (
-            <div className="mb-4">
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={hasUsedDeal}
-                  onChange={handleUsedDealChange}
-                  className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                />
-                <span className="text-sm text-gray-700">I used this deal</span>
-                {hasUsedDeal && <Check className="h-4 w-4 text-emerald-600" />}
-              </label>
+          {/* Coupon Code */}
+          {deal.coupon_code && (
+            <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-3 mb-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Coupon Code:</span>
+                <div className="flex items-center space-x-2">
+                  <code className="bg-white px-2 py-1 rounded border text-sm font-mono">
+                    {deal.coupon_code}
+                  </code>
+                  <button
+                    onClick={() => navigator.clipboard.writeText(deal.coupon_code!)}
+                    className="text-emerald-600 hover:text-emerald-700 text-sm"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
-          {/* Action Buttons */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              {/* Helpful/Not Helpful */}
-              <div className="flex items-center space-x-2">
+          {/* Meta Information */}
+          <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+            <div className="flex items-center space-x-2 text-gray-600">
+              <Tag className="h-4 w-4" />
+              <span>{deal.category}</span>
+            </div>
+            <div className="flex items-center space-x-2 text-gray-600">
+              <Store className="h-4 w-4" />
+              <span>{deal.marketplace}</span>
+            </div>
+            <div className="flex items-center space-x-2 text-gray-600">
+              <User className="h-4 w-4" />
+              <span>{deal.promoter?.email?.split('@')[0] || 'Promoter'}</span>
+            </div>
+            <div className={`flex items-center space-x-2 ${isExpired ? 'text-red-600' : 'text-gray-600'}`}>
+              <Clock className="h-4 w-4" />
+              <span>{timeRemaining}</span>
+            </div>
+          </div>
+
+          {/* Action Button */}
+          <button
+            onClick={handleAffiliateClick}
+            disabled={isExpired}
+            className={`w-full py-3 px-4 rounded-lg font-semibold transition-all duration-200 flex items-center justify-center space-x-2 ${
+              isExpired 
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:shadow-lg transform hover:-translate-y-0.5'
+            }`}
+          >
+            <span>{isExpired ? 'Deal Expired' : 'Get This Deal'}</span>
+            {!isExpired && <ExternalLink className="h-4 w-4" />}
+          </button>
+        </div>
+
+        {/* Interaction Section */}
+        {showFullCard && (
+          <div className="border-t border-gray-100 px-6 py-4">
+            {/* User Interaction Checkbox */}
+            {user && (
+              <div className="mb-4">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hasUsedDeal}
+                    onChange={handleUsedDealChange}
+                    className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <span className="text-sm text-gray-700">I used this deal</span>
+                  {hasUsedDeal && <Check className="h-4 w-4 text-emerald-600" />}
+                </label>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                {/* Helpful/Not Helpful */}
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => handleHelpfulClick(true)}
+                    disabled={!user}
+                    className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm transition-colors ${
+                      helpfulState === true
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    } ${!user ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <ThumbsUp className="h-4 w-4" />
+                    <span>{localCounts.helpful}</span>
+                  </button>
+                  <button
+                    onClick={() => handleHelpfulClick(false)}
+                    disabled={!user}
+                    className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm transition-colors ${
+                      helpfulState === false
+                        ? 'bg-red-100 text-red-700'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    } ${!user ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <ThumbsDown className="h-4 w-4" />
+                    <span>{localCounts.notHelpful}</span>
+                  </button>
+                </div>
+
+                {/* Comments */}
                 <button
-                  onClick={() => handleHelpfulClick(true)}
-                  disabled={!user}
-                  className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm transition-colors ${
-                    deal.user_interaction?.is_helpful === true
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  } ${!user ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  onClick={() => onComment?.(deal.id)}
+                  className="flex items-center space-x-1 text-gray-600 hover:text-emerald-600 transition-colors"
                 >
-                  <ThumbsUp className="h-4 w-4" />
-                  <span>{deal.helpful_count || 0}</span>
+                  <MessageCircle className="h-4 w-4" />
+                  <span className="text-sm">{deal.comments?.length || 0}</span>
                 </button>
-                <button
-                  onClick={() => handleHelpfulClick(false)}
-                  disabled={!user}
-                  className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm transition-colors ${
-                    deal.user_interaction?.is_helpful === false
-                      ? 'bg-red-100 text-red-700'
-                      : 'text-gray-600 hover:bg-gray-100'
-                  } ${!user ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  <ThumbsDown className="h-4 w-4" />
-                  <span>{deal.not_helpful_count || 0}</span>
-                </button>
+
+                {/* Saves */}
+                <div className="flex items-center space-x-1 text-gray-600">
+                  <Heart className="h-4 w-4" />
+                  <span className="text-sm">{localCounts.saves}</span>
+                </div>
               </div>
 
-              {/* Comments */}
+              {/* Share */}
               <button
-                onClick={() => onComment?.(deal.id)}
+                onClick={handleShareClick}
                 className="flex items-center space-x-1 text-gray-600 hover:text-emerald-600 transition-colors"
               >
-                <MessageCircle className="h-4 w-4" />
-                <span className="text-sm">{deal.comments?.length || 0}</span>
+                <Share2 className="h-4 w-4" />
+                <span className="text-sm">{localCounts.shares}</span>
               </button>
-
-              {/* Saves */}
-              <div className="flex items-center space-x-1 text-gray-600">
-                <Heart className="h-4 w-4" />
-                <span className="text-sm">{deal.save_count || 0}</span>
-              </div>
             </div>
-
-            {/* Share */}
-            <button
-              onClick={() => onShare?.(deal.id)}
-              className="flex items-center space-x-1 text-gray-600 hover:text-emerald-600 transition-colors"
-            >
-              <Share2 className="h-4 w-4" />
-              <span className="text-sm">{deal.share_count || 0}</span>
-            </button>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+
+      {/* Share Modal */}
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        dealId={deal.id}
+        dealTitle={deal.title}
+      />
+    </>
   )
 }
 
