@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Gem, LogOut, Search, ChevronDown, Filter, Calendar, X, Menu } from 'lucide-react'
+import { Gem, LogOut, Search, ChevronDown, Filter, Calendar, X, Settings } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
 const Header: React.FC = () => {
@@ -8,12 +8,10 @@ const Header: React.FC = () => {
   const navigate = useNavigate()
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [showAdvancedModal, setShowAdvancedModal] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState('')
-  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false)
   const [timeFilter, setTimeFilter] = useState('')
-  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
-  const [showMobileSearch, setShowMobileSearch] = useState(false)
 
   const categories = [
     'Electronics', 'Fashion', 'Home & Garden', 'Health & Beauty', 
@@ -44,25 +42,17 @@ const Header: React.FC = () => {
   }
 
   const handleSignOut = async () => {
-    if (signingOut) return // Prevent multiple clicks
+    if (signingOut) return
     
     try {
       setSigningOut(true)
       setShowProfileMenu(false)
       
-      console.log('Header: Starting sign out process...')
-      
-      // Call the sign out function
       await signOut()
-      
-      console.log('Header: Sign out completed, navigating to landing page...')
-      
-      // Navigate to landing page with replace to prevent back navigation
       navigate('/', { replace: true })
       
     } catch (error) {
       console.error('Header: Error during sign out:', error)
-      // Even if there's an error, navigate to landing page
       navigate('/', { replace: true })
     } finally {
       setSigningOut(false)
@@ -77,9 +67,7 @@ const Header: React.FC = () => {
     if (timeFilter) params.set('time', timeFilter)
     
     navigate(`/browse-deals?${params.toString()}`)
-    setShowCategoryDropdown(false)
-    setShowAdvancedSearch(false)
-    setShowMobileSearch(false)
+    setShowAdvancedModal(false)
   }
 
   const clearFilters = () => {
@@ -88,10 +76,14 @@ const Header: React.FC = () => {
     setTimeFilter('')
   }
 
-  const closeMobileSearch = () => {
-    setShowMobileSearch(false)
-    setShowCategoryDropdown(false)
-    setShowAdvancedSearch(false)
+  const applyFilters = () => {
+    const params = new URLSearchParams()
+    if (searchTerm) params.set('search', searchTerm)
+    if (selectedCategory) params.set('category', selectedCategory)
+    if (timeFilter) params.set('time', timeFilter)
+    
+    navigate(`/browse-deals?${params.toString()}`)
+    setShowAdvancedModal(false)
   }
 
   return (
@@ -112,10 +104,10 @@ const Header: React.FC = () => {
               </span>
             </Link>
 
-            {/* Desktop Search Bar - Only for authenticated users */}
+            {/* Search Bar - Only for authenticated users */}
             {user && (
-              <div className="hidden lg:flex flex-1 max-w-2xl mx-8">
-                <form onSubmit={handleSearch} className="relative w-full">
+              <div className="flex-1 max-w-2xl mx-4 sm:mx-8">
+                <form onSubmit={handleSearch} className="relative">
                   <div className="flex items-center">
                     <div className="relative flex-1">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -128,57 +120,14 @@ const Header: React.FC = () => {
                       />
                     </div>
                     
-                    {/* Category Dropdown */}
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                        className="px-4 py-2 border-t border-b border-gray-300 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center space-x-2 whitespace-nowrap"
-                      >
-                        <span className="text-sm text-gray-700 max-w-24 truncate">
-                          {selectedCategory || 'All Categories'}
-                        </span>
-                        <ChevronDown className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                      </button>
-                      
-                      {showCategoryDropdown && (
-                        <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-b-lg shadow-lg z-50 max-h-60 overflow-y-auto">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedCategory('')
-                              setShowCategoryDropdown(false)
-                            }}
-                            className="w-full px-4 py-2 text-left hover:bg-gray-50 text-sm"
-                          >
-                            All Categories
-                          </button>
-                          {categories.map(category => (
-                            <button
-                              key={category}
-                              type="button"
-                              onClick={() => {
-                                setSelectedCategory(category)
-                                setShowCategoryDropdown(false)
-                              }}
-                              className="w-full px-4 py-2 text-left hover:bg-gray-50 text-sm"
-                            >
-                              {category}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Advanced Search Toggle */}
+                    {/* Advanced Search Button */}
                     <button
                       type="button"
-                      onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
-                      className={`px-3 py-2 border-t border-b border-gray-300 transition-colors ${
-                        showAdvancedSearch ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-50 hover:bg-gray-100'
-                      }`}
+                      onClick={() => setShowAdvancedModal(true)}
+                      className="px-3 py-2 border-t border-b border-gray-300 bg-gray-50 hover:bg-gray-100 transition-colors"
+                      title="Advanced Search"
                     >
-                      <Filter className="h-4 w-4" />
+                      <Settings className="h-4 w-4 text-gray-600" />
                     </button>
                     
                     {/* Search Button */}
@@ -186,61 +135,16 @@ const Header: React.FC = () => {
                       type="submit"
                       className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-r-lg hover:shadow-lg transition-all duration-200"
                     >
-                      Search
+                      <span className="hidden sm:inline">Search</span>
+                      <Search className="h-4 w-4 sm:hidden" />
                     </button>
                   </div>
-                  
-                  {/* Advanced Search Options */}
-                  {showAdvancedSearch && (
-                    <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-b-lg shadow-lg z-50 p-4 mt-1">
-                      <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
-                        <div className="flex items-center space-x-2">
-                          <Calendar className="h-4 w-4 text-gray-500" />
-                          <span className="text-sm text-gray-700">Time:</span>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {timeFilters.map(filter => (
-                            <button
-                              key={filter.value}
-                              type="button"
-                              onClick={() => setTimeFilter(timeFilter === filter.value ? '' : filter.value)}
-                              className={`px-3 py-1 rounded-full text-sm transition-colors ${
-                                timeFilter === filter.value
-                                  ? 'bg-emerald-100 text-emerald-700'
-                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                              }`}
-                            >
-                              {filter.label}
-                            </button>
-                          ))}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={clearFilters}
-                          className="text-sm text-gray-500 hover:text-gray-700"
-                        >
-                          Clear all
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </form>
               </div>
             )}
 
-            {/* Mobile Search Button and Profile Section */}
+            {/* Profile Section */}
             <div className="flex items-center space-x-2">
-              {/* Mobile Search Button - Only for authenticated users */}
-              {user && (
-                <button
-                  onClick={() => setShowMobileSearch(true)}
-                  className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                >
-                  <Search className="h-5 w-5 text-gray-600" />
-                </button>
-              )}
-
-              {/* Profile Section */}
               {user ? (
                 <div className="relative">
                   <button
@@ -305,140 +209,98 @@ const Header: React.FC = () => {
         </div>
       </header>
 
-      {/* Mobile Search Overlay */}
-      {showMobileSearch && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 lg:hidden">
-          <div className="bg-white h-full overflow-y-auto">
-            {/* Mobile Search Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Search Deals</h2>
-              <button
-                onClick={closeMobileSearch}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                <X className="h-5 w-5 text-gray-600" />
-              </button>
-            </div>
+      {/* Advanced Search Modal */}
+      {showAdvancedModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">Advanced Search</h2>
+                <button
+                  onClick={() => setShowAdvancedModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
 
-            {/* Mobile Search Form */}
-            <div className="p-4">
-              <form onSubmit={handleSearch} className="space-y-4">
+              <div className="space-y-6">
                 {/* Search Input */}
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search deals..."
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                    autoFocus
-                  />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Search Terms
+                  </label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Enter keywords..."
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    />
+                  </div>
                 </div>
 
                 {/* Category Selection */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-left flex items-center justify-between"
-                    >
-                      <span className="text-gray-700">
-                        {selectedCategory || 'All Categories'}
-                      </span>
-                      <ChevronDown className="h-4 w-4 text-gray-500" />
-                    </button>
-                    
-                    {showCategoryDropdown && (
-                      <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto mt-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedCategory('')
-                            setShowCategoryDropdown(false)
-                          }}
-                          className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b border-gray-100"
-                        >
-                          All Categories
-                        </button>
-                        {categories.map(category => (
-                          <button
-                            key={category}
-                            type="button"
-                            onClick={() => {
-                              setSelectedCategory(category)
-                              setShowCategoryDropdown(false)
-                            }}
-                            className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
-                          >
-                            {category}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Category
+                  </label>
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  >
+                    <option value="">All Categories</option>
+                    {categories.map(category => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Time Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    <Calendar className="h-4 w-4 inline mr-1" />
+                    Time Filter
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {timeFilters.map(filter => (
+                      <button
+                        key={filter.value}
+                        type="button"
+                        onClick={() => setTimeFilter(timeFilter === filter.value ? '' : filter.value)}
+                        className={`px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                          timeFilter === filter.value
+                            ? 'bg-emerald-500 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {filter.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                {/* Advanced Filters Toggle */}
-                <button
-                  type="button"
-                  onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
-                  className={`w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-lg border transition-colors ${
-                    showAdvancedSearch 
-                      ? 'bg-emerald-100 text-emerald-700 border-emerald-200' 
-                      : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100'
-                  }`}
-                >
-                  <Filter className="h-4 w-4" />
-                  <span>Advanced Filters</span>
-                </button>
-
-                {/* Advanced Search Options */}
-                {showAdvancedSearch && (
-                  <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        <Calendar className="h-4 w-4 inline mr-1" />
-                        Time Filter
-                      </label>
-                      <div className="grid grid-cols-1 gap-2">
-                        {timeFilters.map(filter => (
-                          <button
-                            key={filter.value}
-                            type="button"
-                            onClick={() => setTimeFilter(timeFilter === filter.value ? '' : filter.value)}
-                            className={`px-4 py-2 rounded-lg text-sm transition-colors ${
-                              timeFilter === filter.value
-                                ? 'bg-emerald-500 text-white'
-                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                            }`}
-                          >
-                            {filter.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    <button
-                      type="button"
-                      onClick={clearFilters}
-                      className="w-full px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      Clear All Filters
-                    </button>
-                  </div>
-                )}
-
-                {/* Search Button */}
-                <button
-                  type="submit"
-                  className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white py-3 rounded-lg font-semibold hover:shadow-lg transition-all duration-200"
-                >
-                  Search Deals
-                </button>
-              </form>
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3 pt-6">
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                  >
+                    Clear All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={applyFilters}
+                    className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200"
+                  >
+                    Apply Filters
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -14,9 +14,11 @@ import Dashboard from './pages/Dashboard'
 import PromoterDashboard from './pages/PromoterDashboard'
 import PromoterResources from './pages/PromoterResources'
 import BrowseDeals from './pages/BrowseDeals'
+import SavedDeals from './pages/SavedDeals'
 import Categories from './pages/Categories'
 import DealDetails from './pages/DealDetails'
 import ForPromoters from './pages/ForPromoters'
+import ProfileSettings from './pages/ProfileSettings'
 import AuthCallback from './pages/AuthCallback'
 
 function App() {
@@ -46,6 +48,22 @@ function App() {
                   } 
                 />
                 <Route 
+                  path="/saved-deals" 
+                  element={
+                    <ProtectedRoute>
+                      <SavedDeals />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/profile" 
+                  element={
+                    <ProtectedRoute>
+                      <ProfileSettings />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
                   path="/promoter-dashboard" 
                   element={
                     <ProtectedRoute>
@@ -61,14 +79,6 @@ function App() {
                     </ProtectedRoute>
                   } 
                 />
-                <Route 
-                  path="/deals" 
-                  element={
-                    <ProtectedRoute>
-                      <Dashboard />
-                    </ProtectedRoute>
-                  } 
-                />
                 <Route path="/auth/callback" element={<AuthCallback />} />
                 {/* Placeholder routes for footer links */}
                 <Route path="/help" element={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><h1 className="text-2xl font-bold text-gray-900">Help Center - Coming Soon</h1></div>} />
@@ -76,7 +86,6 @@ function App() {
                 <Route path="/privacy" element={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><h1 className="text-2xl font-bold text-gray-900">Privacy Policy - Coming Soon</h1></div>} />
                 <Route path="/terms" element={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><h1 className="text-2xl font-bold text-gray-900">Terms of Service - Coming Soon</h1></div>} />
                 <Route path="/about" element={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><h1 className="text-2xl font-bold text-gray-900">About Us - Coming Soon</h1></div>} />
-                <Route path="/profile" element={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><h1 className="text-2xl font-bold text-gray-900">Profile Settings - Coming Soon</h1></div>} />
               </Routes>
             </main>
           </div>

@@ -35,7 +35,7 @@ const Sidebar: React.FC = () => {
     },
     { 
       name: 'Saved Deals', 
-      path: '/dashboard?tab=saved', 
+      path: '/saved-deals', 
       icon: <Heart className="h-5 w-5" />,
       description: 'Your saved favorites'
     }
@@ -59,9 +59,6 @@ const Sidebar: React.FC = () => {
   const menuItems = profile?.user_type === 'promoter' ? promoterMenuItems : regularUserMenuItems
 
   const isActivePath = (path: string) => {
-    if (path.includes('?')) {
-      return location.pathname === path.split('?')[0] && location.search.includes(path.split('?')[1])
-    }
     return location.pathname === path
   }
 
