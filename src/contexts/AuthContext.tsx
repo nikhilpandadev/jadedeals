@@ -105,7 +105,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(null)
           setSession(null)
           // Clear session storage
-          sessionStorage.removeItem('jadedeals_session_id')
+          clearAllStorage()
         }
         
         setLoading(false)
@@ -117,6 +117,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       subscription.unsubscribe()
     }
   }, [])
+
+  const clearAllStorage = () => {
+    try {
+      // Clear session storage
+      sessionStorage.removeItem('jadedeals_session_id')
+      
+      // Clear any Supabase auth tokens from localStorage
+      const keys = Object.keys(localStorage)
+      keys.forEach(key => {
+        if (key.startsWith('sb-') || key.includes('supabase')) {
+          localStorage.removeItem(key)
+        }
+      })
+      
+      // Clear any other app-specific storage
+      keys.forEach(key => {
+        if (key.includes('jadedeals') || key.includes('jade-deals')) {
+          localStorage.removeItem(key)
+        }
+      })
+    } catch (error) {
+      console.error('Error clearing storage:', error)
+    }
+  }
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -300,62 +324,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     console.log('Starting sign out process...')
-    try {
-      // Clear local state first
-      console.log('Clearing local state...')
-      setUser(null)
-      setProfile(null)
-      setSession(null)
-      
-      // Clear any session storage
-      sessionStorage.removeItem('jadedeals_session_id')
-      
-      // Sign out from Supabase with scope 'global' to clear all sessions
-      console.log('Signing out from Supabase...')
-      const { error } = await supabase.auth.signOut({ scope: 'global' })
-      
-      if (error) {
-        console.error('Error signing out from Supabase:', error)
-        // Don't throw the error, just log it and continue
-      }
-      
-      // Additional cleanup - clear any potential localStorage items
+    
+    let retryCount = 0
+    const maxRetries = 3
+    
+    const attemptSignOut = async (): Promise<void> => {
       try {
-        // Clear any Supabase auth tokens from localStorage
-        const keys = Object.keys(localStorage)
-        keys.forEach(key => {
-          if (key.startsWith('sb-') || key.includes('supabase')) {
-            localStorage.removeItem(key)
-          }
-        })
-      } catch (storageError) {
-        console.error('Error clearing localStorage:', storageError)
+        console.log(`Sign out attempt ${retryCount + 1}/${maxRetries}`)
+        
+        // Clear local state immediately to prevent UI flickering
+        console.log('Clearing local state...')
+        setUser(null)
+        setProfile(null)
+        setSession(null)
+        
+        // Clear all storage immediately
+        clearAllStorage()
+        
+        // Sign out from Supabase with global scope to clear all sessions
+        console.log('Signing out from Supabase...')
+        const { error } = await supabase.auth.signOut({ scope: 'global' })
+        
+        if (error) {
+          console.error('Supabase sign out error:', error)
+          throw error
+        }
+        
+        console.log('Sign out completed successfully')
+        
+        // Force a small delay to ensure cleanup is complete
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+      } catch (error) {
+        console.error(`Sign out attempt ${retryCount + 1} failed:`, error)
+        retryCount++
+        
+        if (retryCount < maxRetries) {
+          console.log(`Retrying sign out in 1 second... (attempt ${retryCount + 1}/${maxRetries})`)
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          return attemptSignOut()
+        } else {
+          console.error('All sign out attempts failed, forcing local cleanup')
+          // Even if Supabase sign out fails, ensure local state is cleared
+          setUser(null)
+          setProfile(null)
+          setSession(null)
+          clearAllStorage()
+          
+          // Show error but don't throw to prevent blocking navigation
+          console.error('Sign out failed after all retries, but local state cleared')
+        }
       }
-      
-      console.log('Sign out completed successfully')
-      
-    } catch (error) {
-      console.error('Sign out error:', error)
-      // Even if there's an error, ensure local state is cleared
-      setUser(null)
-      setProfile(null)
-      setSession(null)
-      sessionStorage.removeItem('jadedeals_session_id')
-      
-      // Force clear localStorage as fallback
-      try {
-        const keys = Object.keys(localStorage)
-        keys.forEach(key => {
-          if (key.startsWith('sb-') || key.includes('supabase')) {
-            localStorage.removeItem(key)
-          }
-        })
-      } catch (storageError) {
-        console.error('Error clearing localStorage in catch:', storageError)
-      }
-      
-      throw error
     }
+    
+    await attemptSignOut()
   }
 
   const value = {

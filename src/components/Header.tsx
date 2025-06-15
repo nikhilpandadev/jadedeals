@@ -12,6 +12,7 @@ const Header: React.FC = () => {
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false)
   const [timeFilter, setTimeFilter] = useState('')
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
 
   const categories = [
     'Electronics', 'Fashion', 'Home & Garden', 'Health & Beauty', 
@@ -42,12 +43,28 @@ const Header: React.FC = () => {
   }
 
   const handleSignOut = async () => {
+    if (signingOut) return // Prevent multiple clicks
+    
     try {
+      setSigningOut(true)
+      setShowProfileMenu(false)
+      
+      console.log('Header: Starting sign out process...')
+      
+      // Call the sign out function
       await signOut()
+      
+      console.log('Header: Sign out completed, navigating to landing page...')
+      
+      // Navigate to landing page with replace to prevent back navigation
       navigate('/', { replace: true })
+      
     } catch (error) {
-      console.error('Error during sign out:', error)
+      console.error('Header: Error during sign out:', error)
+      // Even if there's an error, navigate to landing page
       navigate('/', { replace: true })
+    } finally {
+      setSigningOut(false)
     }
   }
 
@@ -206,6 +223,7 @@ const Header: React.FC = () => {
                 <button
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
                   className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50 transition-colors"
+                  disabled={signingOut}
                 >
                   <img
                     src={getRandomAvatar(user.email || '')}
@@ -238,14 +256,12 @@ const Header: React.FC = () => {
                         Profile Settings
                       </Link>
                       <button
-                        onClick={() => {
-                          setShowProfileMenu(false)
-                          handleSignOut()
-                        }}
-                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
+                        onClick={handleSignOut}
+                        disabled={signingOut}
+                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <LogOut className="h-4 w-4" />
-                        <span>Sign Out</span>
+                        <span>{signingOut ? 'Signing Out...' : 'Sign Out'}</span>
                       </button>
                     </div>
                   </div>
