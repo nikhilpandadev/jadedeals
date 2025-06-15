@@ -181,30 +181,65 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   const signUp = async (email: string, password: string, userData: Partial<UserProfile>) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    })
+    console.log('Starting signup process for:', email)
+    
+    try {
+      // First, sign up the user
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/dashboard`
+        }
+      })
 
-    if (error) throw error
-
-    if (data.user) {
-      // Create user profile
-      const profileData = {
-        id: data.user.id,
-        email: data.user.email || email,
-        ...userData,
+      if (error) {
+        console.error('Signup error:', error)
+        throw error
       }
 
-      const { data: profileResult, error: profileError } = await supabase
-        .from('user_profiles')
-        .insert([profileData])
-        .select()
-        .single()
+      console.log('Signup response:', data)
 
-      if (profileError) throw profileError
+      if (data.user) {
+        console.log('User created successfully, creating profile...')
+        
+        // Create user profile
+        const profileData = {
+          id: data.user.id,
+          email: data.user.email || email,
+          user_type: userData.user_type || 'regular',
+          age_group: userData.age_group || '',
+          city: userData.city || '',
+          country: userData.country || '',
+          zip_code: userData.zip_code || '',
+          income_group: userData.income_group || '',
+          preferred_categories: userData.preferred_categories || [],
+          shopping_frequency: userData.shopping_frequency || '',
+          price_sensitivity: userData.price_sensitivity || 'Mid-range',
+        }
 
-      setProfile(profileResult)
+        console.log('Creating profile with data:', profileData)
+
+        const { data: profileResult, error: profileError } = await supabase
+          .from('user_profiles')
+          .insert([profileData])
+          .select()
+          .single()
+
+        if (profileError) {
+          console.error('Profile creation error:', profileError)
+          throw new Error(`Failed to create user profile: ${profileError.message}`)
+        }
+
+        console.log('Profile created successfully:', profileResult)
+        setProfile(profileResult)
+      } else {
+        console.error('No user returned from signup')
+        throw new Error('Failed to create user account')
+      }
+    } catch (error) {
+      console.error('Error in signUp:', error)
+      throw error
     }
   }
 

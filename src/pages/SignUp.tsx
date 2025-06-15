@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, Mail, Lock, User, MapPin, DollarSign, Gem } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, User, MapPin, DollarSign, Gem, AlertCircle } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
 const SignUp: React.FC = () => {
@@ -55,16 +55,34 @@ const SignUp: React.FC = () => {
     }))
   }
 
+  const validateStep1 = () => {
+    if (!formData.email) {
+      setError('Email is required')
+      return false
+    }
+    if (!formData.password) {
+      setError('Password is required')
+      return false
+    }
+    if (!formData.confirmPassword) {
+      setError('Please confirm your password')
+      return false
+    }
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match')
+      return false
+    }
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters')
+      return false
+    }
+    return true
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match')
-      return
-    }
-
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters')
+    if (!validateStep1()) {
       return
     }
 
@@ -72,23 +90,46 @@ const SignUp: React.FC = () => {
     setError('')
 
     try {
-      console.log('Submitting signup form')
-      await signUp(formData.email, formData.password, {
-        user_type: formData.userType,
-        age_group: formData.ageGroup,
+      console.log('Submitting signup form with data:', {
+        email: formData.email,
+        userType: formData.userType,
+        ageGroup: formData.ageGroup,
         city: formData.city,
         country: formData.country,
-        zip_code: formData.zipCode,
-        income_group: formData.incomeGroup,
+        zipCode: formData.zipCode,
+        incomeGroup: formData.incomeGroup,
+        preferredCategories: formData.preferredCategories,
+        shoppingFrequency: formData.shoppingFrequency,
+        priceSensitivity: formData.priceSensitivity
+      })
+
+      await signUp(formData.email, formData.password, {
+        user_type: formData.userType,
+        age_group: formData.ageGroup || '',
+        city: formData.city || '',
+        country: formData.country || '',
+        zip_code: formData.zipCode || '',
+        income_group: formData.incomeGroup || '',
         preferred_categories: formData.preferredCategories,
-        shopping_frequency: formData.shoppingFrequency,
+        shopping_frequency: formData.shoppingFrequency || '',
         price_sensitivity: formData.priceSensitivity
       })
-      console.log('Sign up completed, navigating to dashboard')
+      
+      console.log('Sign up completed successfully')
       navigate('/dashboard', { replace: true })
     } catch (error: any) {
       console.error('Signup error:', error)
-      setError(error.message || 'Failed to create account')
+      
+      // Provide more helpful error messages
+      if (error.message?.includes('User already registered')) {
+        setError('An account with this email already exists. Please sign in instead.')
+      } else if (error.message?.includes('Invalid email')) {
+        setError('Please enter a valid email address.')
+      } else if (error.message?.includes('Password should be at least 6 characters')) {
+        setError('Password must be at least 6 characters long.')
+      } else {
+        setError(error.message || 'Failed to create account. Please try again.')
+      }
     } finally {
       setLoading(false)
     }
@@ -96,16 +137,7 @@ const SignUp: React.FC = () => {
 
   const nextStep = () => {
     if (step === 1) {
-      if (!formData.email || !formData.password || !formData.confirmPassword) {
-        setError('Please fill in all required fields')
-        return
-      }
-      if (formData.password !== formData.confirmPassword) {
-        setError('Passwords do not match')
-        return
-      }
-      if (formData.password.length < 6) {
-        setError('Password must be at least 6 characters')
+      if (!validateStep1()) {
         return
       }
     }
@@ -120,16 +152,20 @@ const SignUp: React.FC = () => {
 
   const handleGoogleSignIn = async () => {
     try {
+      setError('')
       await signInWithGoogle()
     } catch (error: any) {
+      console.error('Google sign in error:', error)
       setError(error.message || 'Failed to sign in with Google')
     }
   }
 
   const handleFacebookSignIn = async () => {
     try {
+      setError('')
       await signInWithFacebook()
     } catch (error: any) {
+      console.error('Facebook sign in error:', error)
       setError(error.message || 'Failed to sign in with Facebook')
     }
   }
@@ -175,8 +211,16 @@ const SignUp: React.FC = () => {
           </div>
 
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-600 text-sm">{error}</p>
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start space-x-3">
+              <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-red-600 text-sm">{error}</p>
+                {error.includes('already exists') && (
+                  <p className="text-red-500 text-xs mt-1">
+                    <Link to="/login" className="underline hover:no-underline">Sign in here</Link>
+                  </p>
+                )}
+              </div>
             </div>
           )}
 
@@ -266,7 +310,8 @@ const SignUp: React.FC = () => {
                       value={formData.password}
                       onChange={handleInputChange}
                       className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
-                      placeholder="Create a password"
+                      placeholder="Create a password (min 6 characters)"
+                      minLength={6}
                     />
                     <button
                       type="button"
@@ -293,6 +338,7 @@ const SignUp: React.FC = () => {
                       onChange={handleInputChange}
                       className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
                       placeholder="Confirm your password"
+                      minLength={6}
                     />
                     <button
                       type="button"
@@ -346,7 +392,8 @@ const SignUp: React.FC = () => {
 
             {step === 2 && (
               <div className="space-y-6">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">Personal Information</h3>
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">Personal Information (Optional)</h3>
+                <p className="text-sm text-gray-600 mb-6">Help us personalize your experience by sharing some basic information.</p>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
@@ -437,7 +484,8 @@ const SignUp: React.FC = () => {
 
             {step === 3 && (
               <div className="space-y-6">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">Shopping Preferences</h3>
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">Shopping Preferences (Optional)</h3>
+                <p className="text-sm text-gray-600 mb-6">Help us show you the most relevant deals.</p>
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -526,9 +574,16 @@ const SignUp: React.FC = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="ml-auto bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-8 py-3 rounded-lg font-semibold hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="ml-auto bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-8 py-3 rounded-lg font-semibold hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                 >
-                  {loading ? 'Creating Account...' : 'Create Account'}
+                  {loading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Creating Account...</span>
+                    </>
+                  ) : (
+                    <span>Create Account</span>
+                  )}
                 </button>
               )}
             </div>
