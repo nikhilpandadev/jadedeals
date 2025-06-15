@@ -152,8 +152,8 @@ const Landing: React.FC = () => {
               </span>
             </h1>
             <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto leading-relaxed">
-              Join JadeDeals - the premier community where deal seekers meet trusted promoters. 
-              Save more, discover exclusive offers, and connect with like-minded shoppers.
+              Join JadeDeals - where smart shoppers discover incredible savings and passionate promoters share their best finds. 
+              Whether you're hunting for deals or sharing them, our community connects you with like-minded people who love great value.
             </p>
             
             {/* Show different CTAs based on authentication status */}
