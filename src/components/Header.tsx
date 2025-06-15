@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Gem, LogOut, Search, ChevronDown, Filter, Calendar, X, Settings } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { getUserAvatar } from '../utils/avatars'
 
 const Header: React.FC = () => {
   const { user, profile, signOut } = useAuth()
@@ -24,22 +25,6 @@ const Header: React.FC = () => {
     { value: '72h', label: 'Last 72 hours' },
     { value: '7d', label: 'Last 7 days' }
   ]
-
-  // Generate random avatar based on user email
-  const getRandomAvatar = (email: string) => {
-    const avatars = [
-      'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
-      'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
-      'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
-      'https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
-      'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
-      'https://images.pexels.com/photos/1681010/pexels-photo-1681010.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
-      'https://images.pexels.com/photos/1181424/pexels-photo-1181424.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
-      'https://images.pexels.com/photos/1040880/pexels-photo-1040880.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
-    ]
-    const hash = email.split('').reduce((a, b) => a + b.charCodeAt(0), 0)
-    return avatars[hash % avatars.length]
-  }
 
   const handleSignOut = async () => {
     if (signingOut) return
@@ -153,9 +138,9 @@ const Header: React.FC = () => {
                     disabled={signingOut}
                   >
                     <img
-                      src={getRandomAvatar(user.email || '')}
+                      src={getUserAvatar(user.email || '', user.id)}
                       alt="Profile"
-                      className="w-8 h-8 rounded-full object-cover border-2 border-emerald-200"
+                      className="w-8 h-8 rounded-full border-2 border-emerald-200"
                     />
                     <div className="hidden sm:block text-left">
                       <div className="text-sm font-medium text-gray-900">

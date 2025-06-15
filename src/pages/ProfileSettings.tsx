@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { getUserAvatar } from '../utils/avatars'
 import { 
   User, 
   Mail, 
@@ -52,22 +53,6 @@ const ProfileSettings: React.FC = () => {
   const incomeGroups = ['Under $25k', '$25k-$50k', '$50k-$75k', '$75k-$100k', '$100k-$150k', 'Over $150k']
   const categories = ['Electronics', 'Fashion', 'Home & Garden', 'Health & Beauty', 'Sports & Outdoors', 'Books & Media', 'Food & Beverages', 'Travel', 'Automotive', 'Toys & Games']
   const frequencies = ['Daily', 'Weekly', 'Monthly', 'Occasionally', 'Rarely']
-
-  // Generate random avatar based on user email
-  const getRandomAvatar = (email: string) => {
-    const avatars = [
-      'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
-      'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
-      'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
-      'https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
-      'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
-      'https://images.pexels.com/photos/1681010/pexels-photo-1681010.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
-      'https://images.pexels.com/photos/1181424/pexels-photo-1181424.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
-      'https://images.pexels.com/photos/1040880/pexels-photo-1040880.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop'
-    ]
-    const hash = email.split('').reduce((a, b) => a + b.charCodeAt(0), 0)
-    return avatars[hash % avatars.length]
-  }
 
   useEffect(() => {
     if (user && profile) {
@@ -221,9 +206,9 @@ const ProfileSettings: React.FC = () => {
               <div className="text-center">
                 <div className="relative inline-block">
                   <img
-                    src={getRandomAvatar(user.email || '')}
+                    src={getUserAvatar(user.email || '', user.id)}
                     alt="Profile"
-                    className="w-24 h-24 rounded-full object-cover border-4 border-emerald-200"
+                    className="w-24 h-24 rounded-full border-4 border-emerald-200"
                   />
                   <button className="absolute bottom-0 right-0 p-2 bg-emerald-500 text-white rounded-full hover:bg-emerald-600 transition-colors">
                     <Camera className="h-4 w-4" />

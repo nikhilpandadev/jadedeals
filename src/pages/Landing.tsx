@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, Users, TrendingUp, Shield, Star, Zap, Target } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase, Deal } from '../lib/supabase'
+import { getUserAvatar } from '../utils/avatars'
 import Carousel from '../components/Carousel'
 
 const Landing: React.FC = () => {

@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { getUserAvatar } from '../utils/avatars'
 import { 
   Search,
   Filter,
@@ -53,7 +54,7 @@ const PromoterResources: React.FC = () => {
       excerpt: 'Everything you need to know about starting with Amazon\'s affiliate program, from application to advanced optimization strategies.',
       author: 'Sarah Chen',
       authorRole: 'Senior Affiliate Manager',
-      authorAvatar: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
+      authorEmail: 'sarah.chen@example.com',
       category: 'marketplaces',
       readTime: '12 min read',
       publishDate: '2 days ago',
@@ -72,7 +73,7 @@ const PromoterResources: React.FC = () => {
       excerpt: 'Discover why Best Buy\'s affiliate program offers some of the best commissions in the electronics space with real case studies.',
       author: 'Mike Rodriguez',
       authorRole: 'Tech Affiliate Expert',
-      authorAvatar: 'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
+      authorEmail: 'mike.rodriguez@example.com',
       category: 'marketplaces',
       readTime: '8 min read',
       publishDate: '4 days ago',
@@ -94,7 +95,7 @@ const PromoterResources: React.FC = () => {
       excerpt: 'Step-by-step guide to joining and succeeding with Shopify\'s affiliate program, including advanced tips.',
       author: 'Emma Thompson',
       authorRole: 'E-commerce Specialist',
-      authorAvatar: 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
+      authorEmail: 'emma.thompson@example.com',
       category: 'marketplaces',
       readTime: '10 min read',
       publishDate: '1 week ago',
@@ -112,7 +113,7 @@ const PromoterResources: React.FC = () => {
       excerpt: 'Learn how to maximize earnings with Target\'s diverse product catalog and seasonal strategies.',
       author: 'David Kim',
       authorRole: 'Lifestyle Affiliate',
-      authorAvatar: 'https://images.pexels.com/photos/1043471/pexels-photo-1043471.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
+      authorEmail: 'david.kim@example.com',
       category: 'marketplaces',
       readTime: '7 min read',
       publishDate: '1 week ago',
@@ -130,7 +131,7 @@ const PromoterResources: React.FC = () => {
       excerpt: 'How to tap into Nike\'s massive brand appeal for affiliate success with authentic content strategies.',
       author: 'Lisa Park',
       authorRole: 'Sports Marketing Pro',
-      authorAvatar: 'https://images.pexels.com/photos/1181686/pexels-photo-1181686.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
+      authorEmail: 'lisa.park@example.com',
       category: 'marketplaces',
       readTime: '9 min read',
       publishDate: '2 weeks ago',
@@ -148,7 +149,7 @@ const PromoterResources: React.FC = () => {
       excerpt: 'Essential framework for creating a successful affiliate marketing plan from scratch.',
       author: 'Alex Johnson',
       authorRole: 'Strategy Consultant',
-      authorAvatar: 'https://images.pexels.com/photos/1681010/pexels-photo-1681010.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
+      authorEmail: 'alex.johnson@example.com',
       category: 'strategies',
       readTime: '15 min read',
       publishDate: '3 weeks ago',
@@ -166,7 +167,7 @@ const PromoterResources: React.FC = () => {
       excerpt: 'How to create compelling content that drives affiliate conversions and builds trust.',
       author: 'Rachel Green',
       authorRole: 'Content Strategist',
-      authorAvatar: 'https://images.pexels.com/photos/1181424/pexels-photo-1181424.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
+      authorEmail: 'rachel.green@example.com',
       category: 'strategies',
       readTime: '11 min read',
       publishDate: '3 weeks ago',
@@ -184,7 +185,7 @@ const PromoterResources: React.FC = () => {
       excerpt: 'Explore the potential of Walmart\'s affiliate program for everyday products and bulk sales.',
       author: 'Tom Wilson',
       authorRole: 'Retail Affiliate Expert',
-      authorAvatar: 'https://images.pexels.com/photos/1040880/pexels-photo-1040880.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&fit=crop',
+      authorEmail: 'tom.wilson@example.com',
       category: 'marketplaces',
       readTime: '6 min read',
       publishDate: '1 month ago',
@@ -429,9 +430,9 @@ const PromoterResources: React.FC = () => {
                         <div className="flex items-center justify-between mb-4">
                           <div className="flex items-center space-x-3">
                             <img
-                              src={article.authorAvatar}
+                              src={getUserAvatar(article.authorEmail)}
                               alt={article.author}
-                              className="w-8 h-8 rounded-full object-cover"
+                              className="w-8 h-8 rounded-full"
                             />
                             <div>
                               <div className="text-sm font-medium text-gray-900">{article.author}</div>
@@ -556,9 +557,9 @@ const PromoterResources: React.FC = () => {
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-3">
                               <img
-                                src={article.authorAvatar}
+                                src={getUserAvatar(article.authorEmail)}
                                 alt={article.author}
-                                className="w-8 h-8 rounded-full object-cover"
+                                className="w-8 h-8 rounded-full"
                               />
                               <div>
                                 <div className="text-sm font-medium text-gray-900">{article.author}</div>
