@@ -276,15 +276,6 @@ const BrowseDeals: React.FC = () => {
               </button>
             </div>
           )}
-
-          {!user && hasMoreDeals && (
-            <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg max-w-md mx-auto">
-              <p className="text-amber-800 text-sm">
-                <strong>Preview Mode:</strong> Showing {FREE_DEALS_LIMIT} of {deals.length} available deals. 
-                Sign up to see all deals and unlock full features!
-              </p>
-            </div>
-          )}
         </div>
 
         {/* No Deals Message */}
