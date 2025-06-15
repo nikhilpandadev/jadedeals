@@ -164,9 +164,6 @@ const Sidebar: React.FC = () => {
       `}>
         <SidebarContent />
       </div>
-
-      {/* Spacer for desktop */}
-      <div className="hidden lg:block w-80 flex-shrink-0" />
     </>
   )
 }
