@@ -20,6 +20,11 @@ import DealDetails from './pages/DealDetails'
 import ForPromoters from './pages/ForPromoters'
 import ProfileSettings from './pages/ProfileSettings'
 import AuthCallback from './pages/AuthCallback'
+import Contact from './pages/Contact'
+import Privacy from './pages/Privacy'
+import Terms from './pages/Terms'
+import About from './pages/About'
+import Help from './pages/Help'
 
 function App() {
   return (
@@ -39,6 +44,11 @@ function App() {
                 <Route path="/categories" element={<Categories />} />
                 <Route path="/deal/:id" element={<DealDetails />} />
                 <Route path="/promoters" element={<ForPromoters />} />
+                <Route path="/contact" element={<Contact />} />
+                <Route path="/privacy" element={<Privacy />} />
+                <Route path="/terms" element={<Terms />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/help" element={<Help />} />
                 <Route 
                   path="/dashboard" 
                   element={
@@ -80,12 +90,6 @@ function App() {
                   } 
                 />
                 <Route path="/auth/callback" element={<AuthCallback />} />
-                {/* Placeholder routes for footer links */}
-                <Route path="/help" element={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><h1 className="text-2xl font-bold text-gray-900">Help Center - Coming Soon</h1></div>} />
-                <Route path="/contact" element={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><h1 className="text-2xl font-bold text-gray-900">Contact Us - Coming Soon</h1></div>} />
-                <Route path="/privacy" element={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><h1 className="text-2xl font-bold text-gray-900">Privacy Policy - Coming Soon</h1></div>} />
-                <Route path="/terms" element={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><h1 className="text-2xl font-bold text-gray-900">Terms of Service - Coming Soon</h1></div>} />
-                <Route path="/about" element={<div className="min-h-screen bg-gray-50 flex items-center justify-center"><h1 className="text-2xl font-bold text-gray-900">About Us - Coming Soon</h1></div>} />
               </Routes>
             </main>
           </div>

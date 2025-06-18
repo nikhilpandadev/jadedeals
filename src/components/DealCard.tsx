@@ -43,7 +43,8 @@ const DealCard: React.FC<DealCardProps> = ({
     helpful: deal.helpful_count || 0,
     notHelpful: deal.not_helpful_count || 0,
     saves: deal.save_count || 0,
-    shares: deal.share_count || 0
+    shares: deal.share_count || 0,
+    comments: deal.comment_count || 0
   })
 
   const getDiscountColor = (percentage: number) => {
@@ -162,6 +163,10 @@ const DealCard: React.FC<DealCardProps> = ({
         console.error('Error tracking share:', error)
       }
     }
+  }
+
+  const handleCommentClick = () => {
+    onComment?.(deal.id)
   }
 
   const timeRemaining = getTimeRemaining(deal.expiry_date)
@@ -332,11 +337,11 @@ const DealCard: React.FC<DealCardProps> = ({
 
                 {/* Comments */}
                 <button
-                  onClick={() => onComment?.(deal.id)}
+                  onClick={handleCommentClick}
                   className="flex items-center space-x-1 text-gray-600 hover:text-emerald-600 transition-colors"
                 >
                   <MessageCircle className="h-4 w-4" />
-                  <span className="text-sm">{deal.comments?.length || 0}</span>
+                  <span className="text-sm">{localCounts.comments}</span>
                 </button>
 
                 {/* Saves */}

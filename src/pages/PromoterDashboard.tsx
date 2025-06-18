@@ -22,9 +22,13 @@ import {
   BarChart3,
   Users,
   Target,
-  BookOpen
+  BookOpen,
+  User,
+  Link as LinkIcon,
+  Globe
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { getUserAvatar } from '../utils/avatars'
 
 const PromoterDashboard: React.FC = () => {
   const { user, profile } = useAuth()
@@ -32,6 +36,7 @@ const PromoterDashboard: React.FC = () => {
   const [stats, setStats] = useState<PromoterStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [showCreateDeal, setShowCreateDeal] = useState(false)
+  const [showProfileEdit, setShowProfileEdit] = useState(false)
   const [selectedDeals, setSelectedDeals] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'expired'>('all')
@@ -39,14 +44,81 @@ const PromoterDashboard: React.FC = () => {
   const [page, setPage] = useState(0)
   const [hasMore, setHasMore] = useState(true)
 
+  // Profile editing state
+  const [profileData, setProfileData] = useState({
+    bio: '',
+    website: '',
+    social_links: {
+      twitter: '',
+      instagram: '',
+      youtube: '',
+      tiktok: ''
+    }
+  })
+
   const ITEMS_PER_PAGE = 10
 
   useEffect(() => {
     if (user && profile?.user_type === 'promoter') {
       fetchStats()
       fetchDeals(0, true)
+      loadPromoterProfile()
     }
   }, [user, profile])
+
+  const loadPromoterProfile = async () => {
+    if (!user) return
+
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('bio, website, social_links')
+        .eq('id', user.id)
+        .single()
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error loading promoter profile:', error)
+        return
+      }
+
+      if (data) {
+        setProfileData({
+          bio: data.bio || '',
+          website: data.website || '',
+          social_links: data.social_links || {
+            twitter: '',
+            instagram: '',
+            youtube: '',
+            tiktok: ''
+          }
+        })
+      }
+    } catch (error) {
+      console.error('Error loading promoter profile:', error)
+    }
+  }
+
+  const updatePromoterProfile = async () => {
+    if (!user) return
+
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          bio: profileData.bio,
+          website: profileData.website,
+          social_links: profileData.social_links,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id)
+
+      if (error) throw error
+
+      setShowProfileEdit(false)
+    } catch (error) {
+      console.error('Error updating promoter profile:', error)
+    }
+  }
 
   const fetchStats = async () => {
     if (!user) return
@@ -325,6 +397,60 @@ const PromoterDashboard: React.FC = () => {
           </div>
         </div>
 
+        {/* Promoter Profile Card */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center space-x-4">
+              <img
+                src={getUserAvatar(user.email || '', user.id)}
+                alt="Profile"
+                className="w-16 h-16 rounded-full border-4 border-emerald-200"
+              />
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">{user.email?.split('@')[0]}</h3>
+                <p className="text-emerald-600 font-medium">Promoter</p>
+                {profileData.bio && (
+                  <p className="text-gray-600 mt-2 max-w-md">{profileData.bio}</p>
+                )}
+                <div className="flex items-center space-x-4 mt-2">
+                  {profileData.website && (
+                    <a
+                      href={profileData.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center space-x-1 text-emerald-600 hover:text-emerald-700 text-sm"
+                    >
+                      <Globe className="h-4 w-4" />
+                      <span>Website</span>
+                    </a>
+                  )}
+                  {Object.entries(profileData.social_links).map(([platform, url]) => 
+                    url && (
+                      <a
+                        key={platform}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center space-x-1 text-emerald-600 hover:text-emerald-700 text-sm capitalize"
+                      >
+                        <LinkIcon className="h-4 w-4" />
+                        <span>{platform}</span>
+                      </a>
+                    )
+                  )}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowProfileEdit(true)}
+              className="flex items-center space-x-2 text-gray-600 hover:text-emerald-600 transition-colors"
+            >
+              <Edit className="h-4 w-4" />
+              <span>Edit Profile</span>
+            </button>
+          </div>
+        </div>
+
         {/* Stats Cards */}
         {stats && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -498,6 +624,16 @@ const PromoterDashboard: React.FC = () => {
           }}
         />
       )}
+
+      {/* Profile Edit Modal */}
+      {showProfileEdit && (
+        <ProfileEditModal
+          profileData={profileData}
+          setProfileData={setProfileData}
+          onClose={() => setShowProfileEdit(false)}
+          onSave={updatePromoterProfile}
+        />
+      )}
     </div>
   )
 }
@@ -577,6 +713,105 @@ const DealRow: React.FC<{
           >
             <Trash2 className="h-4 w-4" />
           </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Profile Edit Modal Component
+const ProfileEditModal: React.FC<{
+  profileData: any
+  setProfileData: (data: any) => void
+  onClose: () => void
+  onSave: () => void
+}> = ({ profileData, setProfileData, onClose, onSave }) => {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">Edit Promoter Profile</h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Bio
+              </label>
+              <textarea
+                value={profileData.bio}
+                onChange={(e) => setProfileData(prev => ({ ...prev, bio: e.target.value }))}
+                placeholder="Tell your audience about yourself and what kind of deals you share..."
+                rows={4}
+                maxLength={500}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none"
+              />
+              <p className="text-xs text-gray-500 mt-1">{profileData.bio.length}/500 characters</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Website
+              </label>
+              <input
+                type="url"
+                value={profileData.website}
+                onChange={(e) => setProfileData(prev => ({ ...prev, website: e.target.value }))}
+                placeholder="https://your-website.com"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-4">
+                Social Media Links
+              </label>
+              <div className="space-y-4">
+                {Object.entries(profileData.social_links).map(([platform, url]) => (
+                  <div key={platform}>
+                    <label className="block text-sm text-gray-600 mb-1 capitalize">
+                      {platform}
+                    </label>
+                    <input
+                      type="url"
+                      value={url}
+                      onChange={(e) => setProfileData(prev => ({
+                        ...prev,
+                        social_links: {
+                          ...prev.social_links,
+                          [platform]: e.target.value
+                        }
+                      }))}
+                      placeholder={`https://${platform}.com/yourusername`}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-4 mt-8">
+            <button
+              onClick={onClose}
+              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onSave}
+              className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg font-semibold hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200"
+            >
+              Save Changes
+            </button>
+          </div>
         </div>
       </div>
     </div>
