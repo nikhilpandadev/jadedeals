@@ -774,26 +774,81 @@ const ProfileEditModal: React.FC<{
                 Social Media Links
               </label>
               <div className="space-y-4">
-                {Object.entries(profileData.social_links).map(([platform, url]) => (
-                  <div key={platform}>
-                    <label className="block text-sm text-gray-600 mb-1 capitalize">
-                      {platform}
-                    </label>
-                    <input
-                      type="url"
-                      value={url}
-                      onChange={(e) => setProfileData(prev => ({
-                        ...prev,
-                        social_links: {
-                          ...prev.social_links,
-                          [platform]: e.target.value
-                        }
-                      }))}
-                      placeholder={`https://${platform}.com/yourusername`}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                    />
-                  </div>
-                ))}
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">
+                    Twitter
+                  </label>
+                  <input
+                    type="url"
+                    value={profileData.social_links.twitter}
+                    onChange={(e) => setProfileData(prev => ({
+                      ...prev,
+                      social_links: {
+                        ...prev.social_links,
+                        twitter: e.target.value
+                      }
+                    }))}
+                    placeholder="https://twitter.com/yourusername"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">
+                    Instagram
+                  </label>
+                  <input
+                    type="url"
+                    value={profileData.social_links.instagram}
+                    onChange={(e) => setProfileData(prev => ({
+                      ...prev,
+                      social_links: {
+                        ...prev.social_links,
+                        instagram: e.target.value
+                      }
+                    }))}
+                    placeholder="https://instagram.com/yourusername"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">
+                    YouTube
+                  </label>
+                  <input
+                    type="url"
+                    value={profileData.social_links.youtube}
+                    onChange={(e) => setProfileData(prev => ({
+                      ...prev,
+                      social_links: {
+                        ...prev.social_links,
+                        youtube: e.target.value
+                      }
+                    }))}
+                    placeholder="https://youtube.com/yourusername"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">
+                    TikTok
+                  </label>
+                  <input
+                    type="url"
+                    value={profileData.social_links.tiktok}
+                    onChange={(e) => setProfileData(prev => ({
+                      ...prev,
+                      social_links: {
+                        ...prev.social_links,
+                        tiktok: e.target.value
+                      }
+                    }))}
+                    placeholder="https://tiktok.com/@yourusername"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  />
+                </div>
               </div>
             </div>
           </div>
