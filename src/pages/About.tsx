@@ -70,7 +70,7 @@ const About: React.FC = () => {
       role: 'Founder & CEO',
       bio: 'Passionate entrepreneur with a love for finding and sharing amazing deals. Nikhil founded JadeDeals to create a community where everyone can save money together.',
       avatar: getUserAvatar('nikhil@jadedeals.me'),
-      achievements: ['Built 3 successful startups', 'Saved $100K+ through deals', 'Featured in TechCrunch']
+      achievements: ['This might start the list.']
     },
     {
       name: 'Claude (AI Assistant)',
