@@ -44,7 +44,9 @@ const DealCard: React.FC<DealCardProps> = ({
     notHelpful: deal.not_helpful_count || 0,
     saves: deal.save_count || 0,
     shares: deal.share_count || 0,
-    comments: deal.comment_count || 0
+    comments: deal.comment_count || 0,
+    views: deal.view_count || 0,
+    clicks: deal.click_count || 0
   })
 
   const getDiscountColor = (percentage: number) => {
@@ -68,40 +70,82 @@ const DealCard: React.FC<DealCardProps> = ({
   }
 
   const handleHelpfulClick = async (isHelpful: boolean) => {
-    if (!user || !onInteraction) return
+    if (!user) return
     
-    const newVote = helpfulState === isHelpful ? null : isHelpful
-    
-    // Update local state immediately for better UX
-    setHelpfulState(newVote)
-    setLocalCounts(prev => {
-      let newHelpful = prev.helpful
-      let newNotHelpful = prev.notHelpful
+    try {
+      const newVote = helpfulState === isHelpful ? null : isHelpful
       
-      // Remove previous vote
-      if (helpfulState === true) newHelpful--
-      if (helpfulState === false) newNotHelpful--
+      // Update local state immediately for better UX
+      setHelpfulState(newVote)
+      setLocalCounts(prev => {
+        let newHelpful = prev.helpful
+        let newNotHelpful = prev.notHelpful
+        
+        // Remove previous vote
+        if (helpfulState === true) newHelpful--
+        if (helpfulState === false) newNotHelpful--
+        
+        // Add new vote
+        if (newVote === true) newHelpful++
+        if (newVote === false) newNotHelpful++
+        
+        return {
+          ...prev,
+          helpful: Math.max(0, newHelpful),
+          notHelpful: Math.max(0, newNotHelpful)
+        }
+      })
       
-      // Add new vote
-      if (newVote === true) newHelpful++
-      if (newVote === false) newNotHelpful++
-      
-      return {
-        ...prev,
-        helpful: Math.max(0, newHelpful),
-        notHelpful: Math.max(0, newNotHelpful)
+      // Update database
+      const { error } = await supabase
+        .from('deal_interactions')
+        .upsert({
+          deal_id: deal.id,
+          user_id: user.id,
+          is_helpful: newVote,
+          has_used: hasUsedDeal
+        })
+
+      if (error) {
+        console.error('Error updating helpful vote:', error)
+        // Revert local state on error
+        setHelpfulState(helpfulState)
+        setLocalCounts(prev => ({
+          ...prev,
+          helpful: deal.helpful_count || 0,
+          notHelpful: deal.not_helpful_count || 0
+        }))
       }
-    })
-    
-    onInteraction(deal.id, { is_helpful: newVote })
+    } catch (error) {
+      console.error('Error in handleHelpfulClick:', error)
+    }
   }
 
-  const handleUsedDealChange = () => {
-    if (!user || !onInteraction) return
+  const handleUsedDealChange = async () => {
+    if (!user) return
     
-    const newUsedState = !hasUsedDeal
-    setHasUsedDeal(newUsedState)
-    onInteraction(deal.id, { has_used: newUsedState })
+    try {
+      const newUsedState = !hasUsedDeal
+      setHasUsedDeal(newUsedState)
+      
+      // Update database
+      const { error } = await supabase
+        .from('deal_interactions')
+        .upsert({
+          deal_id: deal.id,
+          user_id: user.id,
+          is_helpful: helpfulState,
+          has_used: newUsedState
+        })
+
+      if (error) {
+        console.error('Error updating used deal:', error)
+        // Revert local state on error
+        setHasUsedDeal(hasUsedDeal)
+      }
+    } catch (error) {
+      console.error('Error in handleUsedDealChange:', error)
+    }
   }
 
   const handleSaveToggle = async () => {
@@ -111,25 +155,30 @@ const DealCard: React.FC<DealCardProps> = ({
     try {
       if (isSaved) {
         // Remove save
-        await supabase
+        const { error } = await supabase
           .from('deal_saves')
           .delete()
           .eq('deal_id', deal.id)
           .eq('user_id', user.id)
         
+        if (error) throw error
+        
         setLocalCounts(prev => ({ ...prev, saves: Math.max(0, prev.saves - 1) }))
+        setIsSaved(false)
       } else {
         // Add save
-        await supabase
+        const { error } = await supabase
           .from('deal_saves')
           .insert({
             deal_id: deal.id,
             user_id: user.id
           })
         
+        if (error) throw error
+        
         setLocalCounts(prev => ({ ...prev, saves: prev.saves + 1 }))
+        setIsSaved(true)
       }
-      setIsSaved(!isSaved)
     } catch (error) {
       console.error('Error toggling save:', error)
     } finally {
@@ -138,9 +187,20 @@ const DealCard: React.FC<DealCardProps> = ({
   }
 
   const handleAffiliateClick = async () => {
-    // Track click event
-    await trackDealEvent(deal.id, 'click', user?.id)
-    window.open(deal.affiliate_link, '_blank', 'noopener,noreferrer')
+    try {
+      // Track click event
+      await trackDealEvent(deal.id, 'click', user?.id)
+      
+      // Update local click count
+      setLocalCounts(prev => ({ ...prev, clicks: prev.clicks + 1 }))
+      
+      // Open affiliate link
+      window.open(deal.affiliate_link, '_blank', 'noopener,noreferrer')
+    } catch (error) {
+      console.error('Error tracking click:', error)
+      // Still open the link even if tracking fails
+      window.open(deal.affiliate_link, '_blank', 'noopener,noreferrer')
+    }
   }
 
   const handleShareClick = async () => {
@@ -166,11 +226,30 @@ const DealCard: React.FC<DealCardProps> = ({
   }
 
   const handleCommentClick = () => {
-    onComment?.(deal.id)
+    if (onComment) {
+      onComment(deal.id)
+    } else {
+      // Navigate to deal details page
+      window.location.href = `/deal/${deal.id}`
+    }
   }
 
   const timeRemaining = getTimeRemaining(deal.expiry_date)
   const isExpired = timeRemaining === 'Expired'
+
+  // Track view when component mounts
+  React.useEffect(() => {
+    const trackView = async () => {
+      try {
+        await trackDealEvent(deal.id, 'view', user?.id)
+        setLocalCounts(prev => ({ ...prev, views: prev.views + 1 }))
+      } catch (error) {
+        console.error('Error tracking view:', error)
+      }
+    }
+    
+    trackView()
+  }, [deal.id, user?.id])
 
   return (
     <>
@@ -308,32 +387,43 @@ const DealCard: React.FC<DealCardProps> = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 {/* Helpful/Not Helpful */}
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => handleHelpfulClick(true)}
-                    disabled={!user}
-                    className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm transition-colors ${
-                      helpfulState === true
-                        ? 'bg-emerald-100 text-emerald-700'
-                        : 'text-gray-600 hover:bg-gray-100'
-                    } ${!user ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    <ThumbsUp className="h-4 w-4" />
-                    <span>{localCounts.helpful}</span>
-                  </button>
-                  <button
-                    onClick={() => handleHelpfulClick(false)}
-                    disabled={!user}
-                    className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm transition-colors ${
-                      helpfulState === false
-                        ? 'bg-red-100 text-red-700'
-                        : 'text-gray-600 hover:bg-gray-100'
-                    } ${!user ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    <ThumbsDown className="h-4 w-4" />
-                    <span>{localCounts.notHelpful}</span>
-                  </button>
-                </div>
+                {user ? (
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleHelpfulClick(true)}
+                      className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm transition-colors ${
+                        helpfulState === true
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      <ThumbsUp className="h-4 w-4" />
+                      <span>{localCounts.helpful}</span>
+                    </button>
+                    <button
+                      onClick={() => handleHelpfulClick(false)}
+                      className={`flex items-center space-x-1 px-3 py-1 rounded-full text-sm transition-colors ${
+                        helpfulState === false
+                          ? 'bg-red-100 text-red-700'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      <ThumbsDown className="h-4 w-4" />
+                      <span>{localCounts.notHelpful}</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-1 px-3 py-1 rounded-full text-sm text-gray-400">
+                      <ThumbsUp className="h-4 w-4" />
+                      <span>{localCounts.helpful}</span>
+                    </div>
+                    <div className="flex items-center space-x-1 px-3 py-1 rounded-full text-sm text-gray-400">
+                      <ThumbsDown className="h-4 w-4" />
+                      <span>{localCounts.notHelpful}</span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Comments */}
                 <button

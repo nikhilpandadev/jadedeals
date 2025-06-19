@@ -183,6 +183,50 @@ const BrowseDeals: React.FC = () => {
     }
   }
 
+  const handleInteraction = async (dealId: string, interaction: Partial<any>) => {
+    if (!user) return
+
+    try {
+      const { error } = await supabase
+        .from('deal_interactions')
+        .upsert({
+          deal_id: dealId,
+          user_id: user.id,
+          ...interaction
+        })
+
+      if (error) throw error
+
+      // Refresh deals to get updated counts
+      await fetchDeals()
+    } catch (error) {
+      console.error('Error updating interaction:', error)
+    }
+  }
+
+  const handleComment = (dealId: string) => {
+    navigate(`/deal/${dealId}`)
+  }
+
+  const handleShare = async (dealId: string) => {
+    if (!user) return
+
+    try {
+      await supabase
+        .from('deal_shares')
+        .insert({
+          deal_id: dealId,
+          user_id: user.id,
+          platform: 'web'
+        })
+
+      // Refresh deals to get updated counts
+      await fetchDeals()
+    } catch (error) {
+      console.error('Error sharing deal:', error)
+    }
+  }
+
   const clearFilters = () => {
     setSearchParams({})
   }
@@ -325,6 +369,9 @@ const BrowseDeals: React.FC = () => {
                 <DealCard
                   key={deal.id}
                   deal={deal}
+                  onInteraction={handleInteraction}
+                  onComment={handleComment}
+                  onShare={handleShare}
                   showFullCard={!!user}
                 />
               ))}

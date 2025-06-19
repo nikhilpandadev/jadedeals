@@ -23,6 +23,14 @@ export interface UserProfile {
   preferred_categories: string[]
   shopping_frequency: string
   price_sensitivity: 'Budget' | 'Mid-range' | 'Premium'
+  bio?: string
+  website?: string
+  social_links?: {
+    twitter?: string
+    instagram?: string
+    youtube?: string
+    tiktok?: string
+  }
   created_at: string
   updated_at: string
 }
@@ -44,14 +52,16 @@ export interface Deal {
   view_count?: number
   click_count?: number
   save_count?: number
+  helpful_count?: number
+  not_helpful_count?: number
+  comment_count?: number
+  share_count?: number
+  usage_count?: number
   created_at: string
   updated_at: string
   promoter?: UserProfile
   interactions?: DealInteraction[]
   comments?: DealComment[]
-  share_count?: number
-  helpful_count?: number
-  not_helpful_count?: number
   user_interaction?: DealInteraction
   user_saved?: boolean
 }
@@ -128,13 +138,17 @@ export const trackDealEvent = async (
   try {
     const sessionId = !userId ? getSessionId() : null
     
-    await supabase.from('deal_analytics').insert({
+    const { error } = await supabase.from('deal_analytics').insert({
       deal_id: dealId,
       user_id: userId || null,
       session_id: sessionId,
       event_type: eventType,
       user_agent: navigator.userAgent
     })
+
+    if (error) {
+      console.error('Error tracking deal event:', error)
+    }
   } catch (error) {
     console.error('Error tracking deal event:', error)
   }
