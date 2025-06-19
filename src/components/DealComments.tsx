@@ -29,21 +29,55 @@ const DealComments: React.FC<DealCommentsProps> = ({
 
   const fetchComments = async () => {
     try {
-      const { data, error } = await supabase
+      // First, try the direct relationship approach
+      let { data, error } = await supabase
         .from('deal_comments')
         .select(`
           *,
-          user:user_profiles(email)
+          user_profiles!deal_comments_user_id_profile_fkey(email)
         `)
         .eq('deal_id', dealId)
         .order('created_at', { ascending: false })
 
-      if (error) throw error
+      // If that fails, fall back to a manual join approach
+      if (error && error.message.includes('relationship')) {
+        console.log('Direct relationship failed, trying manual approach...')
+        
+        const { data: commentsData, error: commentsError } = await supabase
+          .from('deal_comments')
+          .select('*')
+          .eq('deal_id', dealId)
+          .order('created_at', { ascending: false })
+
+        if (commentsError) throw commentsError
+
+        // Get user profiles for all comment authors
+        const userIds = [...new Set(commentsData?.map(c => c.user_id).filter(Boolean))]
+        
+        if (userIds.length > 0) {
+          const { data: profilesData, error: profilesError } = await supabase
+            .from('user_profiles')
+            .select('id, email')
+            .in('id', userIds)
+
+          if (profilesError) throw profilesError
+
+          // Combine the data
+          data = commentsData?.map(comment => ({
+            ...comment,
+            user_profiles: profilesData?.find(p => p.id === comment.user_id) || null
+          }))
+        } else {
+          data = commentsData
+        }
+      }
+
+      if (error && !error.message.includes('relationship')) throw error
 
       const processedComments = data?.map(comment => ({
         ...comment,
         user: {
-          email: comment.user?.email || 'Unknown User'
+          email: comment.user_profiles?.email || 'Unknown User'
         }
       })) || []
 
@@ -51,6 +85,9 @@ const DealComments: React.FC<DealCommentsProps> = ({
       onCommentCountChange?.(processedComments.length)
     } catch (error) {
       console.error('Error fetching comments:', error)
+      // Set empty comments array on error to prevent infinite loading
+      setComments([])
+      onCommentCountChange?.(0)
     }
   }
 
