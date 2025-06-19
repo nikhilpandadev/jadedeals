@@ -79,7 +79,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         console.log('Auth state changed:', event, session ? 'Session exists' : 'No session')
         
         if (!mounted) return
@@ -87,28 +87,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSession(session)
         setUser(session?.user ?? null)
         
-        if (session?.user) {
-          await fetchProfile(session.user.id)
-          
-          // If this is a new OAuth user, create their profile
-          if (event === 'SIGNED_IN' && session.user.app_metadata.provider) {
-            await createOAuthProfile(session.user)
+        setTimeout(async () => {
+          if (!mounted) return;
+          if (session?.user) {
+            console.log('User signed in: calling fetchProfile with ID:', session.user.id)
+            await fetchProfile(session.user.id)
+            // If this is a new OAuth user, create their profile
+            if (event === 'SIGNED_IN' && session.user.app_metadata.provider) {
+              await createOAuthProfile(session.user)
+            }
+          } else {
+            setProfile(null)
           }
-        } else {
-          setProfile(null)
-        }
-        
-        if (event === 'SIGNED_OUT') {
-          console.log('User signed out, clearing state')
-          // Clear all local state on sign out
-          setProfile(null)
-          setUser(null)
-          setSession(null)
-          // Clear session storage
-          clearAllStorage()
-        }
-        
-        setLoading(false)
+          if (event === 'SIGNED_OUT') {
+            console.log('User signed out, clearing state')
+            // Clear all local state on sign out
+            setProfile(null)
+            setUser(null)
+            setSession(null)
+            // Clear session storage
+            clearAllStorage()
+          }
+          setLoading(false)
+        }, 0);
       }
     )
 
