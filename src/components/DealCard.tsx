@@ -160,11 +160,11 @@ const DealCard: React.FC<DealCardProps> = ({
           .delete()
           .eq('deal_id', deal.id)
           .eq('user_id', user.id)
-        
         if (error) throw error
-        
         setLocalCounts(prev => ({ ...prev, saves: Math.max(0, prev.saves - 1) }))
         setIsSaved(false)
+        // Track unsave event
+        await trackDealEvent(deal.id, 'save', user.id)
       } else {
         // Add save
         const { error } = await supabase
@@ -173,11 +173,11 @@ const DealCard: React.FC<DealCardProps> = ({
             deal_id: deal.id,
             user_id: user.id
           })
-        
         if (error) throw error
-        
         setLocalCounts(prev => ({ ...prev, saves: prev.saves + 1 }))
         setIsSaved(true)
+        // Track save event
+        await trackDealEvent(deal.id, 'save', user.id)
       }
     } catch (error) {
       console.error('Error toggling save:', error)
@@ -188,27 +188,20 @@ const DealCard: React.FC<DealCardProps> = ({
 
   const handleAffiliateClick = async () => {
     try {
-      // Track click event
+      // Track click event for both logged-in and anonymous users
       await trackDealEvent(deal.id, 'click', user?.id)
-      
-      // Update local click count
       setLocalCounts(prev => ({ ...prev, clicks: prev.clicks + 1 }))
-      
-      // Open affiliate link
       window.open(deal.affiliate_link, '_blank', 'noopener,noreferrer')
     } catch (error) {
       console.error('Error tracking click:', error)
-      // Still open the link even if tracking fails
       window.open(deal.affiliate_link, '_blank', 'noopener,noreferrer')
     }
   }
 
   const handleShareClick = async () => {
     setShowShareModal(true)
-    
-    // Track share event and update local count
-    if (user) {
-      try {
+    try {
+      if (user) {
         await supabase
           .from('deal_shares')
           .insert({
@@ -216,12 +209,12 @@ const DealCard: React.FC<DealCardProps> = ({
             user_id: user.id,
             platform: 'web'
           })
-        
-        await trackDealEvent(deal.id, 'share', user.id)
-        setLocalCounts(prev => ({ ...prev, shares: prev.shares + 1 }))
-      } catch (error) {
-        console.error('Error tracking share:', error)
       }
+      // Track share event for both logged-in and anonymous users
+      await trackDealEvent(deal.id, 'share', user?.id)
+      setLocalCounts(prev => ({ ...prev, shares: prev.shares + 1 }))
+    } catch (error) {
+      console.error('Error tracking share:', error)
     }
   }
 
@@ -247,8 +240,9 @@ const DealCard: React.FC<DealCardProps> = ({
         console.error('Error tracking view:', error)
       }
     }
-    
     trackView()
+    // Only run on mount or when deal/user changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deal.id, user?.id])
 
   return (

@@ -106,7 +106,7 @@ export interface DealAnalytics {
   deal_id: string
   user_id?: string
   session_id?: string
-  event_type: 'view' | 'click' | 'share'
+  event_type: 'view' | 'click' | 'share' | 'save' // Added 'save' event type
   created_at: string
   user_agent?: string
   ip_address?: string
@@ -114,6 +114,7 @@ export interface DealAnalytics {
 
 export interface PromoterStats {
   total_deals: number
+  previous_week_deals: boolean
   deals_last_7_days: number
   total_clicks: number
   total_views: number
@@ -132,12 +133,41 @@ export interface PromoterStats {
 // Helper function to track deal analytics
 export const trackDealEvent = async (
   dealId: string,
-  eventType: 'view' | 'click' | 'share',
+  eventType: 'view' | 'click' | 'share' | 'save',
   userId?: string
 ) => {
   try {
     const sessionId = !userId ? getSessionId() : null
-    
+    if (eventType === 'view') {
+      // Only count one view per user/session per deal per 24h
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+      let filter: any = { deal_id: dealId, event_type: 'view' }
+      if (userId) filter.user_id = userId
+      else filter.session_id = sessionId
+      
+      let query = supabase
+        .from('deal_analytics')
+        .select('id')
+        .eq('deal_id', dealId)
+        .eq('event_type', 'view')
+        .gte('created_at', since)
+        .limit(1)
+      if (userId) {
+        query = query.eq('user_id', userId)
+      } else {
+        query = query.eq('session_id', sessionId)
+      }
+      const { data: existing, error: fetchError } = await query
+      if (fetchError) {
+        console.error('Error checking for existing view event:', fetchError)
+        return
+      }
+      
+      if (existing && existing.length > 0) {
+        // Already counted a view in the last 24h
+        return
+      }
+    }
     const { error } = await supabase.from('deal_analytics').insert({
       deal_id: dealId,
       user_id: userId || null,
@@ -145,7 +175,6 @@ export const trackDealEvent = async (
       event_type: eventType,
       user_agent: navigator.userAgent
     })
-
     if (error) {
       console.error('Error tracking deal event:', error)
     }

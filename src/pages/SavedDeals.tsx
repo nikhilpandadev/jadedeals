@@ -185,6 +185,8 @@ const SavedDeals: React.FC = () => {
 
       if (error) throw error
 
+      // Track unsave event
+      await trackDealEvent(dealId, 'save', user.id)
       // Remove from local state
       setDeals(prev => prev.filter(deal => deal.id !== dealId))
       setSelectedDeals(prev => prev.filter(id => id !== dealId))

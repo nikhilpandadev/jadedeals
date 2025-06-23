@@ -30,6 +30,7 @@ import {
 import { Link } from 'react-router-dom'
 import { getUserAvatar } from '../utils/avatars'
 
+
 const PromoterDashboard: React.FC = () => {
   const { user, profile } = useAuth()
   const [deals, setDeals] = useState<Deal[]>([])
@@ -128,118 +129,93 @@ const PromoterDashboard: React.FC = () => {
       const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
       const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000)
 
-      // Get current week stats
-      const { data: currentWeekDeals } = await supabase
+      // 1. Get all deal IDs for this promoter
+      const { data: promoterDeals, error: dealsError } = await supabase
         .from('deals')
-        .select('id, view_count, click_count, save_count, share_count')
-        .eq('promoter_id', user.id)
-        .gte('created_at', sevenDaysAgo.toISOString())
-
-      // Get previous week stats
-      const { data: previousWeekDeals } = await supabase
-        .from('deals')
-        .select('id, view_count, click_count, save_count, share_count')
-        .eq('promoter_id', user.id)
-        .gte('created_at', fourteenDaysAgo.toISOString())
-        .lt('created_at', sevenDaysAgo.toISOString())
-
-      // Get total deals count
-      const { count: totalDeals } = await supabase
-        .from('deals')
-        .select('*', { count: 'exact', head: true })
+        .select('id, created_at')
         .eq('promoter_id', user.id)
 
-      // Calculate stats with test data
-      const currentStats = currentWeekDeals?.reduce((acc, deal) => ({
-        deals: acc.deals + 1,
-        views: acc.views + (deal.view_count || 0),
-        clicks: acc.clicks + (deal.click_count || 0),
-        saves: acc.saves + (deal.save_count || 0),
-        shares: acc.shares + (deal.share_count || 0)
-      }), { deals: 0, views: 0, clicks: 0, saves: 0, shares: 0 }) || { deals: 0, views: 0, clicks: 0, saves: 0, shares: 0 }
-
-      const previousStats = previousWeekDeals?.reduce((acc, deal) => ({
-        deals: acc.deals + 1,
-        views: acc.views + (deal.view_count || 0),
-        clicks: acc.clicks + (deal.click_count || 0),
-        saves: acc.saves + (deal.save_count || 0),
-        shares: acc.shares + (deal.share_count || 0)
-      }), { deals: 0, views: 0, clicks: 0, saves: 0, shares: 0 }) || { deals: 0, views: 0, clicks: 0, saves: 0, shares: 0 }
-
-      // Get all-time totals with enhanced test data
-      const { data: allDeals } = await supabase
-        .from('deals')
-        .select('view_count, click_count, save_count, share_count')
-        .eq('promoter_id', user.id)
-
-      const totals = allDeals?.reduce((acc, deal) => ({
-        views: acc.views + (deal.view_count || 0),
-        clicks: acc.clicks + (deal.click_count || 0),
-        saves: acc.saves + (deal.save_count || 0),
-        shares: acc.shares + (deal.share_count || 0)
-      }), { views: 0, clicks: 0, saves: 0, shares: 0 }) || { views: 0, clicks: 0, saves: 0, shares: 0 }
-
-      // Add test data to make stats more realistic
-      const testDataMultiplier = 50 // Multiply by 50 to make stats look realistic
-      const enhancedTotals = {
-        views: Math.max(totals.views * testDataMultiplier, 15420),
-        clicks: Math.max(totals.clicks * testDataMultiplier, 2340),
-        saves: Math.max(totals.saves * testDataMultiplier, 890),
-        shares: Math.max(totals.shares * testDataMultiplier, 234)
+      if (dealsError) throw dealsError
+      const dealIds = promoterDeals?.map((d: { id: string }) => d.id) || []
+      if (dealIds.length === 0) {
+        setStats({
+          total_deals: 0,
+          previous_week_deals: false,
+          deals_last_7_days: 0,
+          total_clicks: 0,
+          total_views: 0,
+          total_saves: 0,
+          total_shares: 0,
+          conversion_rate: 0,
+          change_vs_previous_week: { deals: 0, clicks: 0, views: 0, saves: 0, shares: 0 }
+        })
+        return
       }
 
-      const enhancedCurrentStats = {
-        deals: Math.max(currentStats.deals, 3),
-        views: Math.max(currentStats.views * testDataMultiplier, 2840),
-        clicks: Math.max(currentStats.clicks * testDataMultiplier, 456),
-        saves: Math.max(currentStats.saves * testDataMultiplier, 167),
-        shares: Math.max(currentStats.shares * testDataMultiplier, 45)
+      // Helper to fetch analytics counts for a period
+      const fetchAnalytics = async (from: Date, to?: Date) => {
+        let query = supabase
+          .from('deal_analytics')
+          .select('event_type, deal_id')
+          .in('deal_id', dealIds)
+          .gte('created_at', from.toISOString())
+        if (to) query = query.lt('created_at', to.toISOString())
+        const { data, error } = await query
+        if (error) throw error
+        // Aggregate by event_type
+        const stats = { views: 0, clicks: 0, saves: 0, shares: 0 }
+        data?.forEach((row: any) => {
+          if (row.event_type === 'view') stats.views += 1
+          if (row.event_type === 'click') stats.clicks += 1
+          if (row.event_type === 'save') stats.saves += 1
+          if (row.event_type === 'share') stats.shares += 1
+        })
+        return stats
       }
 
-      const enhancedPreviousStats = {
-        deals: Math.max(previousStats.deals, 2),
-        views: Math.max(previousStats.views * testDataMultiplier, 2100),
-        clicks: Math.max(previousStats.clicks * testDataMultiplier, 320),
-        saves: Math.max(previousStats.saves * testDataMultiplier, 120),
-        shares: Math.max(previousStats.shares * testDataMultiplier, 28)
-      }
+      // Fetch stats for current week, previous week, and all time
+      const [currentStats, previousStats, totals] = await Promise.all([
+        fetchAnalytics(sevenDaysAgo),
+        fetchAnalytics(fourteenDaysAgo, sevenDaysAgo),
+        fetchAnalytics(new Date('1970-01-01')),
+      ])
 
-      const conversionRate = enhancedTotals.views > 0 ? (enhancedTotals.clicks / enhancedTotals.views) * 100 : 0
+      // Get total deals count and deals in last 7 days/previous 7 days
+      const dealsLast7Days = promoterDeals.filter((d: any) => new Date(d.created_at) >= sevenDaysAgo).length
+      const dealsPrev7Days = promoterDeals.filter((d: any) => new Date(d.created_at) >= fourteenDaysAgo && new Date(d.created_at) < sevenDaysAgo).length
+      const totalDeals = promoterDeals.length
+
+      const conversionRate = totals.views > 0 ? (totals.clicks / totals.views) * 100 : 0
 
       setStats({
-        total_deals: Math.max(totalDeals || 0, 12),
-        deals_last_7_days: enhancedCurrentStats.deals,
-        total_clicks: enhancedTotals.clicks,
-        total_views: enhancedTotals.views,
-        total_saves: enhancedTotals.saves,
-        total_shares: enhancedTotals.shares,
-        conversion_rate: Math.max(conversionRate, 15.2),
+        total_deals: totalDeals,
+        previous_week_deals: dealsPrev7Days > 0 ? true : false,
+        deals_last_7_days: dealsLast7Days,
+        total_clicks: totals.clicks,
+        total_views: totals.views,
+        total_saves: totals.saves,
+        total_shares: totals.shares,
+        conversion_rate: conversionRate,
         change_vs_previous_week: {
-          deals: enhancedPreviousStats.deals > 0 ? ((enhancedCurrentStats.deals - enhancedPreviousStats.deals) / enhancedPreviousStats.deals) * 100 : 50,
-          clicks: enhancedPreviousStats.clicks > 0 ? ((enhancedCurrentStats.clicks - enhancedPreviousStats.clicks) / enhancedPreviousStats.clicks) * 100 : 42.5,
-          views: enhancedPreviousStats.views > 0 ? ((enhancedCurrentStats.views - enhancedPreviousStats.views) / enhancedPreviousStats.views) * 100 : 35.2,
-          saves: enhancedPreviousStats.saves > 0 ? ((enhancedCurrentStats.saves - enhancedPreviousStats.saves) / enhancedPreviousStats.saves) * 100 : 39.2,
-          shares: enhancedPreviousStats.shares > 0 ? ((enhancedCurrentStats.shares - enhancedPreviousStats.shares) / enhancedPreviousStats.shares) * 100 : 60.7
+          deals: dealsPrev7Days > 0 ? ((dealsLast7Days - dealsPrev7Days) / dealsPrev7Days) * 100 : 0,
+          clicks: previousStats.clicks > 0 ? ((currentStats.clicks - previousStats.clicks) / previousStats.clicks) * 100 : 0,
+          views: previousStats.views > 0 ? ((currentStats.views - previousStats.views) / previousStats.views) * 100 : 0,
+          saves: previousStats.saves > 0 ? ((currentStats.saves - previousStats.saves) / previousStats.saves) * 100 : 0,
+          shares: previousStats.shares > 0 ? ((currentStats.shares - previousStats.shares) / previousStats.shares) * 100 : 0
         }
       })
     } catch (error) {
       console.error('Error fetching stats:', error)
-      // Provide fallback test data
       setStats({
-        total_deals: 12,
-        deals_last_7_days: 3,
-        total_clicks: 2340,
-        total_views: 15420,
-        total_saves: 890,
-        total_shares: 234,
-        conversion_rate: 15.2,
-        change_vs_previous_week: {
-          deals: 50,
-          clicks: 42.5,
-          views: 35.2,
-          saves: 39.2,
-          shares: 60.7
-        }
+        total_deals: 0,
+        previous_week_deals: false,
+        deals_last_7_days: 0,
+        total_clicks: 0,
+        total_views: 0,
+        total_saves: 0,
+        total_shares: 0,
+        conversion_rate: 0,
+        change_vs_previous_week: { deals: 0, clicks: 0, views: 0, saves: 0, shares: 0 }
       })
     }
   }
@@ -282,13 +258,34 @@ const PromoterDashboard: React.FC = () => {
 
       if (error) throw error
 
-      // Enhance deals with test data for better engagement metrics
+      // Fetch real stats from deal_analytics for these deals
+      const dealIds = (data || []).map(deal => deal.id)
+      let analyticsMap: Record<string, { view_count: number, click_count: number, save_count: number, share_count: number }> = {}
+      if (dealIds.length > 0) {
+        const { data: analyticsData, error: analyticsError } = await supabase
+          .from('deal_analytics')
+          .select('deal_id, event_type')
+          .in('deal_id', dealIds)
+        if (analyticsError) throw analyticsError
+        // Aggregate counts by deal_id and event_type
+        analyticsData?.forEach((row: any) => {
+          if (!analyticsMap[row.deal_id]) {
+            analyticsMap[row.deal_id] = { view_count: 0, click_count: 0, save_count: 0, share_count: 0 }
+          }
+          if (row.event_type === 'view') analyticsMap[row.deal_id].view_count += 1
+          if (row.event_type === 'click') analyticsMap[row.deal_id].click_count += 1
+          if (row.event_type === 'save') analyticsMap[row.deal_id].save_count += 1
+          if (row.event_type === 'share') analyticsMap[row.deal_id].share_count += 1
+        })
+      }
+
+      // Attach real stats to each deal
       const processedDeals = (data || []).map(deal => ({
         ...deal,
-        view_count: Math.max(deal.view_count || 0, Math.floor(Math.random() * 500) + 100),
-        click_count: Math.max(deal.click_count || 0, Math.floor(Math.random() * 50) + 10),
-        save_count: Math.max(deal.save_count || 0, Math.floor(Math.random() * 25) + 5),
-        share_count: Math.max(deal.share_count || 0, Math.floor(Math.random() * 15) + 2)
+        view_count: analyticsMap[deal.id]?.view_count || 0,
+        click_count: analyticsMap[deal.id]?.click_count || 0,
+        save_count: analyticsMap[deal.id]?.save_count || 0,
+        share_count: analyticsMap[deal.id]?.share_count || 0
       }))
 
       if (reset || pageNum === 0) {
@@ -336,18 +333,20 @@ const PromoterDashboard: React.FC = () => {
     change?: number
     icon: React.ReactNode
     color: string
-  }> = ({ title, value, change, icon, color }) => (
+    previousWeekDeals?: boolean
+  }> = ({ title, value, change, icon, color, previousWeekDeals }) => (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium text-gray-600">{title}</p>
           <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
-          {change !== undefined && (
+          { previousWeekDeals && change !== undefined && (
             <div className={`flex items-center mt-2 text-sm ${
               change >= 0 ? 'text-green-600' : 'text-red-600'
             }`}>
-              {change >= 0 ? <TrendingUp className="h-4 w-4 mr-1" /> : <TrendingDown className="h-4 w-4 mr-1" />}
-              {Math.abs(change).toFixed(1)}% vs last week
+              {change > 0 ? <TrendingUp className="h-4 w-4 mr-1" /> : <TrendingDown className="h-4 w-4 mr-1" />}
+              {change < 0 ? <TrendingDown className="h-4 w-4 mr-1" /> : <TrendingDown className="h-4 w-4 mr-1" />}
+              {change !== 0 ? change.toFixed(1) : 0}
             </div>
           )}
         </div>
@@ -460,6 +459,7 @@ const PromoterDashboard: React.FC = () => {
               change={stats.change_vs_previous_week.deals}
               icon={<BarChart3 className="h-6 w-6 text-white" />}
               color="bg-gradient-to-br from-blue-500 to-blue-600"
+              previousWeekDeals={stats.previous_week_deals}
             />
             <StatCard
               title="Total Views"
@@ -467,6 +467,7 @@ const PromoterDashboard: React.FC = () => {
               change={stats.change_vs_previous_week.views}
               icon={<Eye className="h-6 w-6 text-white" />}
               color="bg-gradient-to-br from-emerald-500 to-emerald-600"
+              previousWeekDeals={stats.previous_week_deals}
             />
             <StatCard
               title="Total Clicks"
@@ -474,12 +475,14 @@ const PromoterDashboard: React.FC = () => {
               change={stats.change_vs_previous_week.clicks}
               icon={<MousePointer className="h-6 w-6 text-white" />}
               color="bg-gradient-to-br from-purple-500 to-purple-600"
+              previousWeekDeals={stats.previous_week_deals}
             />
             <StatCard
               title="Conversion Rate"
               value={`${stats.conversion_rate.toFixed(1)}%`}
               icon={<Target className="h-6 w-6 text-white" />}
               color="bg-gradient-to-br from-orange-500 to-orange-600"
+              previousWeekDeals={stats.previous_week_deals}
             />
           </div>
         )}
@@ -493,6 +496,7 @@ const PromoterDashboard: React.FC = () => {
               change={stats.change_vs_previous_week.saves}
               icon={<Heart className="h-6 w-6 text-white" />}
               color="bg-gradient-to-br from-pink-500 to-pink-600"
+              previousWeekDeals={stats.previous_week_deals}
             />
             <StatCard
               title="Total Shares"
@@ -500,6 +504,7 @@ const PromoterDashboard: React.FC = () => {
               change={stats.change_vs_previous_week.shares}
               icon={<Share2 className="h-6 w-6 text-white" />}
               color="bg-gradient-to-br from-cyan-500 to-cyan-600"
+              previousWeekDeals={stats.previous_week_deals}
             />
             <StatCard
               title="Deals This Week"
@@ -507,6 +512,7 @@ const PromoterDashboard: React.FC = () => {
               change={stats.change_vs_previous_week.deals}
               icon={<Calendar className="h-6 w-6 text-white" />}
               color="bg-gradient-to-br from-indigo-500 to-indigo-600"
+              previousWeekDeals={stats.previous_week_deals}
             />
           </div>
         )}

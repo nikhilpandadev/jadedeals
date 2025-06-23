@@ -295,13 +295,18 @@ const DealDetails: React.FC = () => {
 
   const handleAffiliateClick = () => {
     if (deal) {
+      // Track click event for both logged-in and anonymous users
       trackDealEvent(deal.id, 'click', user?.id)
       window.open(deal.affiliate_link, '_blank', 'noopener,noreferrer')
     }
   }
 
-  const handleShareClick = () => {
+  const handleShareClick = async () => {
     setShowShareModal(true)
+    // Track share event for both logged-in and anonymous users
+    if (deal) {
+      await trackDealEvent(deal.id, 'share', user?.id)
+    }
   }
 
   const handleCommentClick = () => {

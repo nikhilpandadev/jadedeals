@@ -81,6 +81,11 @@ const SignUp: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log('Submitting step:', step)
+    if (step < 3) {
+      // Don't submit, just go to next step
+      return
+    }
     
     if (!validateStep1()) {
       return
