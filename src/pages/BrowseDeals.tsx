@@ -148,7 +148,23 @@ const BrowseDeals: React.FC = () => {
       // Fetch promoter profiles separately
       const dealIds = dealsToUse?.map(deal => deal.promoter_id).filter(Boolean) || []
       let promoterProfiles = []
-      
+      // Also collect deal ids for save count aggregation
+      const dealRowIds = dealsToUse?.map(deal => deal.id) || []
+      let saveCounts: Record<string, number> = {}
+      if (dealRowIds.length > 0) {
+        // Aggregate save counts for all deals
+        const { data: saves, error: savesError } = await supabase
+          .from('deal_saves')
+          .select('deal_id', { count: 'exact', head: false })
+          .in('deal_id', dealRowIds)
+        if (!savesError && saves) {
+          // Count saves per deal_id
+          saves.forEach((row: any) => {
+            if (!saveCounts[row.deal_id]) saveCounts[row.deal_id] = 0
+            saveCounts[row.deal_id]++
+          })
+        }
+      }
       if (dealIds.length > 0) {
         const { data: profiles, error: profileError } = await supabase
           .from('user_profiles')
@@ -168,12 +184,12 @@ const BrowseDeals: React.FC = () => {
         not_helpful_count: deal.interactions?.filter(i => i.is_helpful === false).length || 0,
         user_interaction: deal.user_interaction?.[0] || null,
         user_saved: deal.user_saved?.length > 0,
+        save_count: saveCounts[deal.id] || 0,
         promoter: {
           email: promoterProfiles?.find(p => p.id === deal.promoter_id)?.email || 'Unknown'
         }
       })) || []
 
-      console.log('Processed deals:', processedDeals.length, 'Filters:', { searchTerm, categoryFromUrl, timeFilter })
       setDeals(processedDeals)
     } catch (error) {
       console.error('Error fetching deals:', error)

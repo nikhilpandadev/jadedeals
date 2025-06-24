@@ -9,6 +9,7 @@ import {
   MousePointer, 
   Heart, 
   Share2,
+  MessageCircle,
   Calendar,
   Filter,
   Search,
@@ -44,6 +45,7 @@ const PromoterDashboard: React.FC = () => {
   const [sortBy, setSortBy] = useState<'created_at' | 'expiry_date' | 'performance'>('created_at')
   const [page, setPage] = useState(0)
   const [hasMore, setHasMore] = useState(true)
+  const [showCommentsModal, setShowCommentsModal] = useState<null | string>(null) // dealId or null
 
   // Profile editing state
   const [profileData, setProfileData] = useState({
@@ -155,8 +157,8 @@ const PromoterDashboard: React.FC = () => {
       // Helper to fetch analytics counts for a period
       const fetchAnalytics = async (from: Date, to?: Date) => {
         let query = supabase
-          .from('deal_analytics')
-          .select('event_type, deal_id')
+          .from('daily_deal_analytics')
+          .select('event_type, deal_id, user_id')
           .in('deal_id', dealIds)
           .gte('created_at', from.toISOString())
         if (to) query = query.lt('created_at', to.toISOString())
@@ -260,17 +262,32 @@ const PromoterDashboard: React.FC = () => {
 
       // Fetch real stats from deal_analytics for these deals
       const dealIds = (data || []).map(deal => deal.id)
-      let analyticsMap: Record<string, { view_count: number, click_count: number, save_count: number, share_count: number }> = {}
+      let analyticsMap: Record<string, { view_count: number, click_count: number, save_count: number, share_count: number, comment_count: number }> = {}
       if (dealIds.length > 0) {
         const { data: analyticsData, error: analyticsError } = await supabase
-          .from('deal_analytics')
+          .from('daily_deal_analytics')
           .select('deal_id, event_type')
           .in('deal_id', dealIds)
         if (analyticsError) throw analyticsError
+
+        // Fetch comment counts for each deal
+        const { data: commentsData, error: commentsError } = await supabase
+          .from('deal_comments')
+          .select('*')
+          .in('deal_id', dealIds)
+
+        if (commentsError) throw commentsError
+
         // Aggregate counts by deal_id and event_type
         analyticsData?.forEach((row: any) => {
           if (!analyticsMap[row.deal_id]) {
-            analyticsMap[row.deal_id] = { view_count: 0, click_count: 0, save_count: 0, share_count: 0 }
+            analyticsMap[row.deal_id] = { 
+              view_count: 0, 
+              click_count: 0, 
+              save_count: 0, 
+              share_count: 0, 
+              comment_count: commentsData.filter(deal => deal.deal_id === row.deal_id).length 
+            }
           }
           if (row.event_type === 'view') analyticsMap[row.deal_id].view_count += 1
           if (row.event_type === 'click') analyticsMap[row.deal_id].click_count += 1
@@ -285,7 +302,8 @@ const PromoterDashboard: React.FC = () => {
         view_count: analyticsMap[deal.id]?.view_count || 0,
         click_count: analyticsMap[deal.id]?.click_count || 0,
         save_count: analyticsMap[deal.id]?.save_count || 0,
-        share_count: analyticsMap[deal.id]?.share_count || 0
+        share_count: analyticsMap[deal.id]?.share_count || 0,
+        comment_count: analyticsMap[deal.id]?.comment_count || 0
       }))
 
       if (reset || pageNum === 0) {
@@ -600,6 +618,7 @@ const PromoterDashboard: React.FC = () => {
                         console.error('Error deleting deal:', error)
                       }
                     }}
+                    onViewComments={() => setShowCommentsModal(deal.id)}
                   />
                 ))}
               </div>
@@ -640,6 +659,14 @@ const PromoterDashboard: React.FC = () => {
           onSave={updatePromoterProfile}
         />
       )}
+
+      {/* Comments Modal */}
+      {showCommentsModal && (
+        <CommentsModal
+          dealId={showCommentsModal}
+          onClose={() => setShowCommentsModal(null)}
+        />
+      )}
     </div>
   )
 }
@@ -651,9 +678,9 @@ const DealRow: React.FC<{
   onSelect: (selected: boolean) => void
   onEdit: () => void
   onDelete: () => void
-}> = ({ deal, selected, onSelect, onEdit, onDelete }) => {
+  onViewComments: () => void
+}> = ({ deal, selected, onSelect, onEdit, onDelete, onViewComments }) => {
   const isExpired = new Date(deal.expiry_date) < new Date()
-
   return (
     <div className={`border rounded-lg p-4 ${selected ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200'}`}>
       <div className="flex items-center space-x-4">
@@ -696,6 +723,16 @@ const DealRow: React.FC<{
             <span className="flex items-center space-x-1">
               <Share2 className="h-4 w-4" />
               <span>{deal.share_count || 0}</span>
+            </span>
+            <span className="flex items-center space-x-1">
+              <button
+                onClick={onViewComments}
+                className="focus:outline-none"
+                title="View Comments"
+              >
+                <MessageCircle className="h-4 w-4 text-emerald-600 hover:text-emerald-700 transition-colors" />
+              </button>
+              <span>{deal.comment_count || 0}</span>
             </span>
           </div>
         </div>
@@ -1131,6 +1168,178 @@ const CreateDealModal: React.FC<{
               </button>
             </div>
           </form>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Comments Modal Component
+const CommentsModal: React.FC<{
+  dealId: string
+  onClose: () => void
+}> = ({ dealId, onClose }) => {
+  const { user } = useAuth()
+  const [comments, setComments] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [replyContent, setReplyContent] = useState('')
+  const [replyingTo, setReplyingTo] = useState<string | null>(null)
+  const [error, setError] = useState('')
+
+  // Fetch comments for the deal
+  useEffect(() => {
+    const fetchComments = async () => {
+      setLoading(true)
+      setError('')
+      try {
+        const { data, error } = await supabase
+          .from('deal_comments')
+          .select('*')
+          .eq('deal_id', dealId)
+          .order('created_at', { ascending: true })
+        if (error) throw error
+        setComments(data || [])
+      } catch (err: any) {
+        setError(err.message || 'Failed to load comments')
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchComments()
+  }, [dealId])
+
+  // Post a reply
+  const handleReply = async (parentId: string | null) => {
+    if (!user || !replyContent.trim()) return
+    setError('')
+    try {
+      const { error } = await supabase.from('deal_comments').insert({
+        deal_id: dealId,
+        user_id: user.id,
+        comment: replyContent,
+        parent_id: parentId || null,
+        created_at: new Date().toISOString()
+      })
+      if (error) throw error
+      setReplyContent('')
+      setReplyingTo(null)
+      // Refresh comments
+      const { data } = await supabase
+        .from('deal_comments')
+        .select('*')
+        .eq('deal_id', dealId)
+        .order('created_at', { ascending: true })
+      setComments(data || [])
+    } catch (err: any) {
+      setError(err.message || 'Failed to post reply')
+    }
+  }
+
+  // Helper to nest comments
+  const nestComments = (comments: any[]) => {
+    const map: Record<string, any> = {}
+    const roots: any[] = []
+    comments.forEach(c => { map[c.id] = { ...c, replies: [] } })
+    comments.forEach(c => {
+      if (c.parent_id && map[c.parent_id]) {
+        map[c.parent_id].replies.push(map[c.id])
+      } else {
+        roots.push(map[c.id])
+      }
+    })
+    return roots
+  }
+
+  const renderComments = (comments: any[], level = 0) => (
+    <div>
+      {comments.map(comment => (
+        <div key={comment.id} className={`mb-4 ml-${level * 6}`}>
+          <div className="flex items-start space-x-3">
+            <img
+              src={getUserAvatar(comment.user_id, comment.user_id)}
+              alt="avatar"
+              className="w-8 h-8 rounded-full border"
+            />
+            <div className="flex-1">
+              <div className="bg-gray-100 rounded-lg px-4 py-2">
+                <div className="text-sm text-gray-900 font-medium">{comment.user_id === user?.id ? 'You' : comment.user_id}</div>
+                <div className="text-gray-700 text-sm mt-1">{comment.comment}</div>
+                <div className="text-xs text-gray-400 mt-1">{new Date(comment.created_at).toLocaleString()}</div>
+              </div>
+              <button
+                className="text-emerald-600 text-xs mt-1 hover:underline"
+                onClick={() => {
+                  setReplyingTo(comment.id)
+                  setReplyContent('')
+                }}
+              >Reply</button>
+              {replyingTo === comment.id && (
+                <div className="mt-2 flex items-center space-x-2">
+                  <input
+                    type="text"
+                    value={replyContent}
+                    onChange={e => setReplyContent(e.target.value)}
+                    className="flex-1 px-3 py-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
+                    placeholder="Write a reply..."
+                  />
+                  <button
+                    onClick={() => handleReply(comment.id)}
+                    className="px-3 py-2 bg-emerald-500 text-white rounded-lg font-medium hover:bg-emerald-600"
+                  >Send</button>
+                  <button
+                    onClick={() => setReplyingTo(null)}
+                    className="px-2 py-2 text-gray-400 hover:text-gray-600"
+                  ><X className="h-4 w-4" /></button>
+                </div>
+              )}
+              {comment.replies && comment.replies.length > 0 && renderComments(comment.replies, level + 1)}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">Deal Comments</h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+          {error && <div className="mb-4 text-red-600 text-sm">{error}</div>}
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+            </div>
+          ) : (
+            <>
+              {renderComments(nestComments(comments))}
+              {/* Top-level reply */}
+              <div className="mt-6">
+                <input
+                  type="text"
+                  value={replyingTo === null ? replyContent : ''}
+                  onChange={e => { if (replyingTo === null) setReplyContent(e.target.value) }}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  placeholder="Write a comment..."
+                />
+                <div className="flex justify-end mt-2">
+                  <button
+                    onClick={() => handleReply(null)}
+                    disabled={!replyContent.trim() || replyingTo !== null}
+                    className="px-6 py-2 bg-emerald-500 text-white rounded-lg font-semibold hover:bg-emerald-600 disabled:opacity-50"
+                  >Post Comment</button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

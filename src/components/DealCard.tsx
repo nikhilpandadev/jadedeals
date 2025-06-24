@@ -71,40 +71,45 @@ const DealCard: React.FC<DealCardProps> = ({
 
   const handleHelpfulClick = async (isHelpful: boolean) => {
     if (!user) return
-    
+
     try {
-      const newVote = helpfulState === isHelpful ? null : isHelpful
-      
-      // Update local state immediately for better UX
-      setHelpfulState(newVote)
+      // Determine the new state
+      let newHelpfulState: boolean | null = helpfulState
+      if (helpfulState === isHelpful) {
+        newHelpfulState = null // Unvote if clicking the same button
+      } else {
+        newHelpfulState = isHelpful
+      }
+
+      // Update local state for immediate feedback
+      setHelpfulState(newHelpfulState)
       setLocalCounts(prev => {
         let newHelpful = prev.helpful
         let newNotHelpful = prev.notHelpful
-        
         // Remove previous vote
         if (helpfulState === true) newHelpful--
         if (helpfulState === false) newNotHelpful--
-        
         // Add new vote
-        if (newVote === true) newHelpful++
-        if (newVote === false) newNotHelpful++
-        
+        if (newHelpfulState === true) newHelpful++
+        if (newHelpfulState === false) newNotHelpful++
         return {
           ...prev,
           helpful: Math.max(0, newHelpful),
           notHelpful: Math.max(0, newNotHelpful)
         }
       })
-      
+
       // Update database
       const { error } = await supabase
         .from('deal_interactions')
-        .upsert({
-          deal_id: deal.id,
-          user_id: user.id,
-          is_helpful: newVote,
-          has_used: hasUsedDeal
-        })
+        .upsert([
+          {
+            deal_id: deal.id,
+            user_id: user.id,
+            is_helpful: newHelpfulState,
+            has_used: hasUsedDeal
+          }
+        ], { onConflict: 'deal_id,user_id' })
 
       if (error) {
         console.error('Error updating helpful vote:', error)
@@ -150,7 +155,6 @@ const DealCard: React.FC<DealCardProps> = ({
 
   const handleSaveToggle = async () => {
     if (!user) return
-    
     setSaveLoading(true)
     try {
       if (isSaved) {
@@ -163,16 +167,17 @@ const DealCard: React.FC<DealCardProps> = ({
         if (error) throw error
         setLocalCounts(prev => ({ ...prev, saves: Math.max(0, prev.saves - 1) }))
         setIsSaved(false)
-        // Track unsave event
-        await trackDealEvent(deal.id, 'save', user.id)
+        // No event tracking on unsave
       } else {
         // Add save
         const { error } = await supabase
           .from('deal_saves')
-          .insert({
-            deal_id: deal.id,
-            user_id: user.id
-          })
+          .upsert([
+            {
+              deal_id: deal.id,
+              user_id: user.id
+            }
+          ], { onConflict: 'deal_id,user_id' })
         if (error) throw error
         setLocalCounts(prev => ({ ...prev, saves: prev.saves + 1 }))
         setIsSaved(true)
@@ -441,7 +446,6 @@ const DealCard: React.FC<DealCardProps> = ({
                 className="flex items-center space-x-1 text-gray-600 hover:text-emerald-600 transition-colors"
               >
                 <Share2 className="h-4 w-4" />
-                <span className="text-sm">{localCounts.shares}</span>
               </button>
             </div>
           </div>
