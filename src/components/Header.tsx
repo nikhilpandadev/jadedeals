@@ -4,7 +4,11 @@ import { Gem, LogOut, Search, ChevronDown, Filter, Calendar, X, Settings } from 
 import { useAuth } from '../contexts/AuthContext'
 import { getUserAvatar } from '../utils/avatars'
 
-const Header: React.FC = () => {
+interface HeaderProps {
+  showSearchBar?: boolean;
+}
+
+const Header: React.FC<HeaderProps> = ({ showSearchBar = true }) => {
   const { user, profile, signOut } = useAuth()
   const navigate = useNavigate()
   const [showProfileMenu, setShowProfileMenu] = useState(false)
@@ -90,7 +94,7 @@ const Header: React.FC = () => {
             </Link>
 
             {/* Search Bar - Only for authenticated users */}
-            {user && (
+            {showSearchBar && user && (
               <div className="flex-1 max-w-2xl mx-4 sm:mx-8">
                 <form onSubmit={handleSearch} className="relative">
                   <div className="flex items-center">

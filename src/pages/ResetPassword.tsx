@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { Eye, EyeOff, Lock, Gem, CheckCircle, AlertCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
@@ -8,26 +8,27 @@ const ResetPassword: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
-  
-  const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
 
-  // Check if we have the required tokens from the URL
+  const navigate = useNavigate()
+
   useEffect(() => {
-    const accessToken = searchParams.get('access_token')
-    const refreshToken = searchParams.get('refresh_token')
-    
-    if (!accessToken || !refreshToken) {
-      setError('Invalid reset link. Please request a new password reset.')
+    const validateSession = async () => {
+      const { data, error } = await supabase.auth.getUser()
+      if (!data.user || error) {
+        setError('Session is invalid or has expired. Please request a new password reset.')
+      }
+      setLoading(false)
     }
-  }, [searchParams])
+
+    validateSession()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (password !== confirmPassword) {
       setError('Passwords do not match')
       return
@@ -42,45 +43,31 @@ const ResetPassword: React.FC = () => {
     setError('')
 
     try {
-      const accessToken = searchParams.get('access_token')
-      const refreshToken = searchParams.get('refresh_token')
-
-      if (!accessToken || !refreshToken) {
-        throw new Error('Invalid reset link')
-      }
-
-      // Set the session using the tokens from the URL
-      const { error: sessionError } = await supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken
-      })
-
-      if (sessionError) throw sessionError
-
-      // Update the password
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: password
-      })
-
+      const { error: updateError } = await supabase.auth.updateUser({ password })
       if (updateError) throw updateError
 
       setSuccess(true)
-      
-      // Redirect to login after a short delay
       setTimeout(() => {
-        navigate('/login', { 
-          state: { 
-            message: 'Password updated successfully! Please sign in with your new password.' 
-          } 
+        navigate('/login', {
+          state: {
+            message: 'Password updated successfully! Please sign in with your new password.'
+          }
         })
       }, 2000)
-
     } catch (error: any) {
       console.error('Password reset error:', error)
       setError(error.message || 'Failed to reset password. Please try again.')
     } finally {
       setLoading(false)
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p>Checking session...</p>
+      </div>
+    )
   }
 
   if (success) {

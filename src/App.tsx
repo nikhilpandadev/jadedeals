@@ -1,10 +1,8 @@
 import React from 'react'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
-import Header from './components/Header'
-import Sidebar from './components/Sidebar'
-import Footer from './components/Footer'
-import BoltNewBadge from './components/BoltNewBadge'
+import UserLayout from './components/UserLayout'
+import PromoterLayout from './components/PromoterLayout'
 import ProtectedRoute from './components/ProtectedRoute'
 import Landing from './pages/Landing'
 import Login from './pages/Login'
@@ -30,78 +28,71 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <div className="min-h-screen flex flex-col">
-          <Header />
-          <div className="flex flex-1">
-            <Sidebar />
-            <main className="flex-1">
-              <Routes>
-                <Route path="/" element={<Landing />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/signup" element={<SignUp />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-                <Route path="/browse-deals" element={<BrowseDeals />} />
-                <Route path="/categories" element={<Categories />} />
-                <Route path="/deal/:id" element={<DealDetails />} />
-                <Route path="/promoters" element={<ForPromoters />} />
-                <Route path="/contact" element={<Contact />} />
-                <Route path="/privacy" element={<Privacy />} />
-                <Route path="/terms" element={<Terms />} />
-                <Route path="/about" element={<About />} />
-                <Route path="/help" element={<Help />} />
-                <Route 
-                  path="/dashboard" 
-                  element={
-                    <ProtectedRoute>
-                      <Dashboard />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/saved-deals" 
-                  element={
-                    <ProtectedRoute>
-                      <SavedDeals />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/profile" 
-                  element={
-                    <ProtectedRoute>
-                      <ProfileSettings />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/promoter-dashboard" 
-                  element={
-                    <ProtectedRoute>
-                      <PromoterDashboard />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/promoter-resources" 
-                  element={
-                    <ProtectedRoute>
-                      <PromoterResources />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route path="/auth/callback" element={<AuthCallback />} />
-              </Routes>
-            </main>
-          </div>
-          <Footer />
-          
-          {/* Bolt.new Badge */}
-          <BoltNewBadge 
-            variant="auto"
-            size="medium"
-            position="bottom-right"
-          />
-        </div>
+        <Routes>
+          {/* User Layout Routes */}
+          <Route element={<UserLayout />}>
+            <Route path="/" element={<Landing />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<SignUp />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/browse-deals" element={<BrowseDeals />} />
+            <Route path="/categories" element={<Categories />} />
+            <Route path="/deal/:id" element={<DealDetails />} />
+            <Route path="/promoters" element={<ForPromoters />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/help" element={<Help />} />
+            <Route 
+              path="/dashboard" 
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/saved-deals" 
+              element={
+                <ProtectedRoute>
+                  <SavedDeals />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/profile" 
+              element={
+                <ProtectedRoute>
+                  <ProfileSettings />
+                </ProtectedRoute>
+              } 
+            />
+          </Route>
+
+          {/* Promoter Layout Routes */}
+          <Route element={<PromoterLayout />}>
+            <Route 
+              path="/promoter-dashboard" 
+              element={
+                <ProtectedRoute>
+                  <PromoterDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/promoter-resources" 
+              element={
+                <ProtectedRoute>
+                  <PromoterResources />
+                </ProtectedRoute>
+              } 
+            />
+          </Route>
+
+          {/* Auth Callback outside layouts */}
+          <Route path="/auth/callback" element={<AuthCallback />} />
+        </Routes>
       </AuthProvider>
     </Router>
   )
