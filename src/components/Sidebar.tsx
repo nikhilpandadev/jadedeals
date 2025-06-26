@@ -20,7 +20,7 @@ const Sidebar: React.FC = () => {
 
   if (!user) return null
 
-  const regularUserMenuItems = [
+  const ShopperUserMenuItems = [
     { 
       name: 'Browse Deals', 
       path: '/browse-deals', 
@@ -56,7 +56,7 @@ const Sidebar: React.FC = () => {
     }
   ]
 
-  const menuItems = profile?.user_type === 'promoter' ? promoterMenuItems : regularUserMenuItems
+  const menuItems = profile?.user_type === 'promoter' ? promoterMenuItems : ShopperUserMenuItems
 
   const isActivePath = (path: string) => {
     return location.pathname === path

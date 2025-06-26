@@ -26,7 +26,7 @@ const ProfileSettings: React.FC = () => {
   
   const [formData, setFormData] = useState({
     email: '',
-    userType: 'regular' as 'regular' | 'promoter',
+    userType: 'Shopper' as 'Shopper' | 'promoter',
     username: '', // NEW
     ageGroup: '',
     city: '',

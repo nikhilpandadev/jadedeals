@@ -25,7 +25,7 @@
 CREATE TABLE IF NOT EXISTS user_profiles (
   id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email text UNIQUE NOT NULL,
-  user_type text NOT NULL CHECK (user_type IN ('regular', 'promoter')),
+  user_type text NOT NULL CHECK (user_type IN ('Shopper', 'promoter')),
   age_group text,
   city text,
   country text,

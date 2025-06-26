@@ -20,13 +20,13 @@ const Help: React.FC = () => {
       id: '1',
       category: 'getting-started',
       question: 'How do I create an account on JadeDeals?',
-      answer: 'Creating an account is easy! Click the "Sign Up" button in the top right corner, choose between a regular user or promoter account, fill in your details, and you\'re ready to start discovering amazing deals. You can also sign up using Google or Facebook for faster registration.'
+      answer: 'Creating an account is easy! Click the "Sign Up" button in the top right corner, choose between a Shopper or promoter account, fill in your details, and you\'re ready to start discovering amazing deals. You can also sign up using Google or Facebook for faster registration.'
     },
     {
       id: '2',
       category: 'getting-started',
-      question: 'What\'s the difference between regular users and promoters?',
-      answer: 'Regular users can browse deals, save favorites, comment, and interact with the community. Promoters can do all of that plus post their own deals, access analytics, and earn commissions through affiliate links. Both account types are completely free!'
+      question: 'What\'s the difference between Shoppers and promoters?',
+      answer: 'Shoppers can browse deals, save favorites, comment, and interact with the community. Promoters can do all of that plus post their own deals, access analytics, and earn commissions through affiliate links. Both account types are completely free!'
     },
     {
       id: '3',

@@ -9,7 +9,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-export type UserType = 'regular' | 'promoter'
+export type UserType = 'Shopper' | 'promoter'
 
 export interface UserProfile {
   id: string

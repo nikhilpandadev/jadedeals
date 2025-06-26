@@ -9,7 +9,7 @@ const SignUp: React.FC = () => {
     username: '', // NEW: username field
     password: '',
     confirmPassword: '',
-    userType: 'regular' as 'regular' | 'promoter',
+    userType: 'Shopper' as 'Shopper' | 'promoter',
     firstName: '', // NEW
     lastName: '',  // NEW
     ageGroup: '',
@@ -300,19 +300,19 @@ const SignUp: React.FC = () => {
                       <input
                         type="radio"
                         name="userType"
-                        value="regular"
-                        checked={formData.userType === 'regular'}
+                        value="Shopper"
+                        checked={formData.userType === 'Shopper'}
                         onChange={handleInputChange}
                         className="sr-only"
                       />
                       <div className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                        formData.userType === 'regular' 
+                        formData.userType === 'Shopper' 
                           ? 'border-emerald-500 bg-emerald-50' 
                           : 'border-gray-300 hover:border-gray-400'
                       }`}>
                         <div className="text-center">
                           <User className="h-8 w-8 mx-auto mb-2 text-emerald-600" />
-                          <div className="font-medium">Regular User</div>
+                          <div className="font-medium">Shopper</div>
                           <div className="text-sm text-gray-500">Browse and discover deals</div>
                         </div>
                       </div>

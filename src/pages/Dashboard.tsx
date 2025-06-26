@@ -8,8 +8,8 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     if (!loading && user && profile) {
-      // Redirect regular users to browse deals (their home page)
-      if (profile.user_type === 'regular') {
+      // Redirect Shopper users to browse deals (their home page)
+      if (profile.user_type === 'Shopper') {
         navigate('/browse-deals', { replace: true })
       }
       // Redirect promoters to their dashboard

@@ -176,7 +176,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const profileData = {
           id: user.id,
           email: user.email || '',
-          user_type: 'regular' as const,
+          user_type: 'Shopper' as const,
           age_group: '',
           city: '',
           country: '',
@@ -231,7 +231,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const profileData = {
           id: data.user.id,
           email: data.user.email || email,
-          user_type: userData.user_type || 'regular',
+          user_type: userData.user_type || 'Shopper',
           first_name: userData.first_name || '',
           last_name: userData.last_name || '',
           username: userData.username || '',
