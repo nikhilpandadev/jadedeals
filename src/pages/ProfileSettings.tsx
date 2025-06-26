@@ -27,6 +27,7 @@ const ProfileSettings: React.FC = () => {
   const [formData, setFormData] = useState({
     email: '',
     userType: 'regular' as 'regular' | 'promoter',
+    username: '', // NEW
     ageGroup: '',
     city: '',
     country: '',
@@ -59,6 +60,7 @@ const ProfileSettings: React.FC = () => {
       setFormData({
         email: user.email || '',
         userType: profile.user_type,
+        username: profile.username || '', // NEW
         ageGroup: profile.age_group || '',
         city: profile.city || '',
         country: profile.country || '',
@@ -92,10 +94,40 @@ const ProfileSettings: React.FC = () => {
     setSaving(true)
     setMessage(null)
 
+    // Username validation
+    if (!formData.username || formData.username.length < 3) {
+      setMessage({ type: 'error', text: 'Username must be at least 3 characters.' })
+      setSaving(false)
+      return
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(formData.username)) {
+      setMessage({ type: 'error', text: 'Username can only contain letters, numbers, and underscores.' })
+      setSaving(false)
+      return
+    }
+    // Check uniqueness
+    const { data: existing, error: usernameError } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('username', formData.username)
+      .neq('id', user.id)
+      .maybeSingle()
+    if (usernameError) {
+      setMessage({ type: 'error', text: 'Error checking username. Please try again.' })
+      setSaving(false)
+      return
+    }
+    if (existing) {
+      setMessage({ type: 'error', text: 'Username is already taken.' })
+      setSaving(false)
+      return
+    }
+
     try {
       const { error } = await supabase
         .from('user_profiles')
         .update({
+          username: formData.username,
           age_group: formData.ageGroup,
           city: formData.city,
           country: formData.country,
@@ -111,8 +143,6 @@ const ProfileSettings: React.FC = () => {
       if (error) throw error
 
       setMessage({ type: 'success', text: 'Profile updated successfully!' })
-      
-      // Clear message after 3 seconds
       setTimeout(() => setMessage(null), 3000)
     } catch (error: any) {
       console.error('Error updating profile:', error)
@@ -251,6 +281,28 @@ const ProfileSettings: React.FC = () => {
               </div>
 
               <form onSubmit={handleProfileSubmit} className="space-y-6">
+                {/* Username */}
+                <div>
+                  <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
+                    Username <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="username"
+                    name="username"
+                    type="text"
+                    value={formData.username}
+                    onChange={handleInputChange}
+                    className="w-full py-3 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                    placeholder="Choose a unique username"
+                    required
+                    minLength={3}
+                    maxLength={32}
+                    pattern="^[a-zA-Z0-9_]+$"
+                    autoComplete="off"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">This will be your public profile link: /promoter/&lt;username&gt;</p>
+                </div>
+
                 {/* Email (Read-only) */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">

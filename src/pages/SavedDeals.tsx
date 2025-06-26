@@ -432,6 +432,8 @@ const SavedDeals: React.FC = () => {
                     onInteraction={handleInteraction}
                     onComment={handleComment}
                     onShare={handleShare}
+                    showSavedStatus={false}
+                    showPromoter={true}
                   />
                 </div>
               ))}

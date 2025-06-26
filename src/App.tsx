@@ -23,6 +23,7 @@ import Privacy from './pages/Privacy'
 import Terms from './pages/Terms'
 import About from './pages/About'
 import Help from './pages/Help'
+import PromoterProfile from './pages/PromoterProfile'
 
 function App() {
   return (
@@ -68,6 +69,11 @@ function App() {
                 </ProtectedRoute>
               } 
             />
+            <Route path="/promoter/:username" element={
+              <ProtectedRoute>
+                <PromoterProfile />
+              </ProtectedRoute>
+            } />
           </Route>
 
           {/* Promoter Layout Routes */}

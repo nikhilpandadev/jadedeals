@@ -6,9 +6,12 @@ import { useAuth } from '../contexts/AuthContext'
 const SignUp: React.FC = () => {
   const [formData, setFormData] = useState({
     email: '',
+    username: '', // NEW: username field
     password: '',
     confirmPassword: '',
     userType: 'regular' as 'regular' | 'promoter',
+    firstName: '', // NEW
+    lastName: '',  // NEW
     ageGroup: '',
     city: '',
     country: '',
@@ -24,6 +27,8 @@ const SignUp: React.FC = () => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [step, setStep] = useState(1)
+  const [usernameChecking, setUsernameChecking] = useState(false) // NEW
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean|null>(null) // NEW
 
   const { signUp, signInWithGoogle, signInWithFacebook, user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
@@ -55,9 +60,48 @@ const SignUp: React.FC = () => {
     }))
   }
 
+  // Username validation (format)
+  const validateUsernameFormat = (username: string) => {
+    // 3-20 chars, alphanumeric, underscores, no spaces
+    return /^[a-zA-Z0-9_]{3,20}$/.test(username)
+  }
+
+  // Username uniqueness check (async)
+  const checkUsernameAvailability = async (username: string) => {
+    setUsernameChecking(true)
+    setUsernameAvailable(null)
+    try {
+      // Use supabase client directly (imported, not window.supabase)
+      const { data, error } = await import('../lib/supabase').then(({ supabase }) =>
+        supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('username', username)
+          .maybeSingle()
+      )
+      setUsernameAvailable(!data)
+    } catch (e) {
+      setUsernameAvailable(null)
+    } finally {
+      setUsernameChecking(false)
+    }
+  }
+
   const validateStep1 = () => {
     if (!formData.email) {
       setError('Email is required')
+      return false
+    }
+    if (!formData.username) {
+      setError('Username is required')
+      return false
+    }
+    if (!validateUsernameFormat(formData.username)) {
+      setError('Username must be 3-20 characters, letters, numbers, or underscores only')
+      return false
+    }
+    if (usernameAvailable === false) {
+      setError('Username is already taken')
       return false
     }
     if (!formData.password) {
@@ -86,18 +130,18 @@ const SignUp: React.FC = () => {
       // Don't submit, just go to next step
       return
     }
-    
-    if (!validateStep1()) {
+    if (!(await validateStep1())) {
       return
     }
-
     setLoading(true)
     setError('')
-
     try {
       console.log('Submitting signup form with data:', {
         email: formData.email,
+        username: formData.username, // NEW
         userType: formData.userType,
+        firstName: formData.firstName, // NEW
+        lastName: formData.lastName,   // NEW
         ageGroup: formData.ageGroup,
         city: formData.city,
         country: formData.country,
@@ -110,6 +154,9 @@ const SignUp: React.FC = () => {
 
       await signUp(formData.email, formData.password, {
         user_type: formData.userType,
+        username: formData.username, // NEW: send username
+        first_name: formData.firstName || '', // NEW
+        last_name: formData.lastName || '',   // NEW
         age_group: formData.ageGroup || '',
         city: formData.city || '',
         country: formData.country || '',
@@ -132,6 +179,8 @@ const SignUp: React.FC = () => {
         setError('Please enter a valid email address.')
       } else if (error.message?.includes('Password should be at least 6 characters')) {
         setError('Password must be at least 6 characters long.')
+      } else if (error.message?.includes('username')) {
+        setError('Username is already taken or invalid.')
       } else {
         setError(error.message || 'Failed to create account. Please try again.')
       }
@@ -174,6 +223,16 @@ const SignUp: React.FC = () => {
       setError(error.message || 'Failed to sign in with Facebook')
     }
   }
+
+  // Watch username for availability check
+  useEffect(() => {
+    if (formData.username && validateUsernameFormat(formData.username)) {
+      checkUsernameAvailability(formData.username)
+    } else {
+      setUsernameAvailable(null)
+    }
+    // eslint-disable-next-line
+  }, [formData.username])
 
   // Show loading while checking auth state
   if (authLoading) {
@@ -301,6 +360,39 @@ const SignUp: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Username field */}
+                <div>
+                  <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
+                    Username *
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input
+                      id="username"
+                      name="username"
+                      type="text"
+                      required
+                      value={formData.username}
+                      onChange={handleInputChange}
+                      className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors ${
+                        usernameAvailable === false ? 'border-red-400' : usernameAvailable === true ? 'border-emerald-500' : 'border-gray-300'
+                      }`}
+                      placeholder="Choose a unique username"
+                      autoComplete="off"
+                    />
+                    {usernameChecking && (
+                      <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-xs">Checking...</span>
+                    )}
+                    {usernameAvailable === true && (
+                      <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-emerald-600 text-xs">Available</span>
+                    )}
+                    {usernameAvailable === false && (
+                      <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-red-500 text-xs">Taken</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">3-20 characters, letters, numbers, or underscores. This will be your public profile link.</p>
+                </div>
+
                 <div>
                   <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                     Password *
@@ -399,7 +491,37 @@ const SignUp: React.FC = () => {
               <div className="space-y-6">
                 <h3 className="text-xl font-semibold text-gray-900 mb-4">Personal Information (Optional)</h3>
                 <p className="text-sm text-gray-600 mb-6">Help us personalize your experience by sharing some basic information.</p>
-                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-2">
+                      First Name
+                    </label>
+                    <input
+                      id="firstName"
+                      name="firstName"
+                      type="text"
+                      value={formData.firstName}
+                      onChange={handleInputChange}
+                      className="w-full py-3 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                      placeholder="Enter your first name"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-2">
+                      Last Name
+                    </label>
+                    <input
+                      id="lastName"
+                      name="lastName"
+                      type="text"
+                      value={formData.lastName}
+                      onChange={handleInputChange}
+                      className="w-full py-3 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                      placeholder="Enter your last name"
+                    />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label htmlFor="ageGroup" className="block text-sm font-medium text-gray-700 mb-2">

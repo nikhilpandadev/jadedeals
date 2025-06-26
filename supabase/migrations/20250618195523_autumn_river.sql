@@ -20,6 +20,20 @@ BEGIN
   ) THEN
     ALTER TABLE user_profiles ADD COLUMN bio text;
   END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'user_profiles' AND column_name = 'first_name'
+  ) THEN
+    ALTER TABLE user_profiles ADD COLUMN first_name text;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'user_profiles' AND column_name = 'last_name'
+  ) THEN
+    ALTER TABLE user_profiles ADD COLUMN last_name text;
+  END IF;
 END $$;
 
 -- Add website field for promoter websites

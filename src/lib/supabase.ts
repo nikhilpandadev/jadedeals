@@ -15,6 +15,9 @@ export interface UserProfile {
   id: string
   email: string
   user_type: UserType
+  first_name: string
+  last_name: string
+  username?: string // NEW
   age_group: string
   city: string
   country: string
@@ -46,6 +49,7 @@ export interface Deal {
   category: string
   marketplace: string
   promoter_id: string
+  promoter_username?: string // NEW
   affiliate_link: string
   expiry_date: string
   image_url?: string

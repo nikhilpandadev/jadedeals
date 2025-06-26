@@ -90,7 +90,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setTimeout(async () => {
           if (!mounted) return;
           if (session?.user) {
-            console.log('User signed in: calling fetchProfile with ID:', session.user.id)
             await fetchProfile(session.user.id)
             // If this is a new OAuth user, create their profile
             if (event === 'SIGNED_IN' && session.user.app_metadata.provider) {
@@ -233,6 +232,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           id: data.user.id,
           email: data.user.email || email,
           user_type: userData.user_type || 'regular',
+          first_name: userData.first_name || '',
+          last_name: userData.last_name || '',
+          username: userData.username || '',
           age_group: userData.age_group || '',
           city: userData.city || '',
           country: userData.country || '',

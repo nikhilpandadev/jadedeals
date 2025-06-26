@@ -49,6 +49,9 @@ const PromoterDashboard: React.FC = () => {
 
   // Profile editing state
   const [profileData, setProfileData] = useState({
+    first_name: '',
+    last_name: '',
+    username: '',
     bio: '',
     website: '',
     social_links: {
@@ -75,7 +78,7 @@ const PromoterDashboard: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('user_profiles')
-        .select('bio, website, social_links')
+        .select('first_name, last_name, username, bio, website, social_links')
         .eq('id', user.id)
         .single()
 
@@ -86,6 +89,9 @@ const PromoterDashboard: React.FC = () => {
 
       if (data) {
         setProfileData({
+          first_name: data.first_name || '',
+          last_name: data.last_name || '',
+          username: data.username || '',
           bio: data.bio || '',
           website: data.website || '',
           social_links: data.social_links || {
@@ -105,9 +111,19 @@ const PromoterDashboard: React.FC = () => {
     if (!user) return
 
     try {
+      // Update username in deals if changed
+      if (profile?.username && profileData.username && profile?.username !== profileData.username) {
+        await supabase
+          .from('deals')
+          .update({ promoter_username: profileData.username })
+          .eq('promoter_id', user.id)
+      }
       const { error } = await supabase
         .from('user_profiles')
         .update({
+          first_name: profileData.first_name,
+          last_name: profileData.last_name,
+          username: profileData.username, // NEW
           bio: profileData.bio,
           website: profileData.website,
           social_links: profileData.social_links,
@@ -232,6 +248,7 @@ const PromoterDashboard: React.FC = () => {
         .from('deals')
         .select('*')
         .eq('promoter_id', user.id)
+        .eq('promoter_username', profile?.username) // NEW: filter by username
 
       // Apply filters
       if (searchTerm) {
@@ -424,7 +441,7 @@ const PromoterDashboard: React.FC = () => {
                 className="w-16 h-16 rounded-full border-4 border-emerald-200"
               />
               <div>
-                <h3 className="text-xl font-bold text-gray-900">{user.email?.split('@')[0]}</h3>
+                <h3 className="text-xl font-bold text-gray-900">{profileData.first_name} {profileData.last_name} ({user.email?.split('@')[0]})</h3>
                 <p className="text-emerald-600 font-medium">Promoter</p>
                 {profileData.bio && (
                   <p className="text-gray-600 mt-2 max-w-md">{profileData.bio}</p>
@@ -781,6 +798,33 @@ const ProfileEditModal: React.FC<{
             >
               <X className="h-6 w-6" />
             </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                First Name
+              </label>
+              <input
+                type="text"
+                value={profileData.first_name}
+                onChange={(e) => setProfileData(prev => ({ ...prev, first_name: e.target.value }))}
+                placeholder="John"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Last Name
+              </label>
+              <input
+                type="text"
+                value={profileData.last_name}
+                onChange={(e) => setProfileData(prev => ({ ...prev, last_name: e.target.value }))}
+                placeholder="Doe"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              />
+            </div>
           </div>
 
           <div className="space-y-6">

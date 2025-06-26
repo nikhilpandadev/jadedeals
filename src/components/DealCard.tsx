@@ -24,6 +24,8 @@ interface DealCardProps {
   onComment?: (dealId: string) => void
   onShare?: (dealId: string) => void
   showFullCard?: boolean
+  showPromoter?: boolean // NEW: show promoter info as link
+  showSavedStatus?: boolean // NEW: show saved status
 }
 
 const DealCard: React.FC<DealCardProps> = ({ 
@@ -31,7 +33,9 @@ const DealCard: React.FC<DealCardProps> = ({
   onInteraction,
   onComment,
   onShare,
-  showFullCard = true
+  showFullCard = true,
+  showPromoter = true, // NEW: default true
+  showSavedStatus = true // NEW: default false
 }) => {
   const { user } = useAuth()
   const [hasUsedDeal, setHasUsedDeal] = useState(deal.user_interaction?.has_used || false)
@@ -289,7 +293,9 @@ const DealCard: React.FC<DealCardProps> = ({
                       : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-red-500'
                   }`}
                 >
-                  {isSaved ? <Heart className="h-4 w-4 fill-current" /> : <Heart className="h-4 w-4" />}
+                  {(showSavedStatus && (
+                    isSaved ? <Heart className="h-4 w-4 fill-current" /> : <Heart className="h-4 w-4" />
+                  ))}
                 </button>
               )}
             </div>
@@ -338,10 +344,21 @@ const DealCard: React.FC<DealCardProps> = ({
               <Store className="h-4 w-4" />
               <span>{deal.marketplace}</span>
             </div>
-            <div className="flex items-center space-x-2 text-gray-600">
-              <User className="h-4 w-4" />
-              <span>{deal.promoter?.email?.split('@')[0] || 'Promoter'}</span>
-            </div>
+            {showPromoter && (
+              <div className="flex items-center space-x-2 text-gray-600">
+                <User className="h-4 w-4" />
+                {deal.promoter_username && deal.promoter_username.length > 0 ? (
+                  <a
+                    href={`/promoter/${deal.promoter_username}`}
+                    className="text-emerald-600 hover:underline"
+                  >
+                    {deal.promoter?.first_name || deal.promoter?.email?.split('@')[0] || 'Promoter'}
+                  </a>
+                ) : (
+                  <span>{deal.promoter?.first_name || 'Promoter'}</span>
+                )}
+              </div>
+            )}
             <div className={`flex items-center space-x-2 ${isExpired ? 'text-red-600' : 'text-gray-600'}`}>
               <Clock className="h-4 w-4" />
               <span>{timeRemaining}</span>

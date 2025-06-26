@@ -12,17 +12,18 @@ const sidebarAndSearchRoutes = [
   '/saved-deals',
   '/deal/', // for detail pages
   '/profile',
+  '/promoter', // for Promoter resources
   // add more as needed
 ];
 
-const shouldShowSidebarAndSearch = (pathname: string) =>
+const shouldShowSidebarAndSearch = (pathname: string) => 
   sidebarAndSearchRoutes.some(route =>
     route.endsWith('/') ? pathname.startsWith(route) : pathname === route
   );
 
 const UserLayout = () => {
-  const location = useLocation();
-  const show = shouldShowSidebarAndSearch(location.pathname);
+  //const location = useLocation();
+  const show = true //shouldShowSidebarAndSearch(location.pathname);
   return (
     <div className="min-h-screen flex flex-col">
       <Header showSearchBar={show} />
