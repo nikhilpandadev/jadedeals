@@ -40,6 +40,10 @@ CREATE TABLE IF NOT EXISTS deal_analytics (
   ip_address inet
 );
 
+CREATE VIEW daily_deal_analytics WITH (security_invoker=on) AS
+SELECT DISTINCT event_type, deal_id, user_id, date(created_at)
+FROM deal_analytics;
+
 -- Create deal_saves table for save functionality
 CREATE TABLE IF NOT EXISTS deal_saves (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
