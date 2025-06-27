@@ -201,3 +201,40 @@ export const getSessionId = (): string => {
   }
   return sessionId
 }
+
+// Social connection (followers) helpers
+export const followPromoter = async (shopperId: string, promoterId: string) => {
+  return supabase.from('followers').insert({ shopper_id: shopperId, promoter_id: promoterId });
+};
+
+export const unfollowPromoter = async (shopperId: string, promoterId: string) => {
+  return supabase.from('followers').delete().eq('shopper_id', shopperId).eq('promoter_id', promoterId);
+};
+
+export const isFollowingPromoter = async (shopperId: string, promoterId: string) => {
+  const { data, error } = await supabase
+    .from('followers')
+    .select('id')
+    .eq('shopper_id', shopperId)
+    .eq('promoter_id', promoterId)
+    .single();
+  return { isFollowing: !!data, error };
+};
+
+export const getPromotersFollowedByShopper = async (shopperId: string) => {
+  return supabase
+    .from('followers')
+    .select('promoter_id, promoter:promoter_id(id, username, first_name, last_name)')
+    .eq('shopper_id', shopperId);
+};
+
+export const getFollowersOfPromoter = async (promoterId: string) => {
+  return supabase
+    .from('followers')
+    .select('shopper_id, shopper:shopper_id(id, username, first_name, last_name)')
+    .eq('promoter_id', promoterId);
+};
+
+export const removeFollower = async (promoterId: string, shopperId: string) => {
+  return supabase.from('followers').delete().eq('promoter_id', promoterId).eq('shopper_id', shopperId);
+};

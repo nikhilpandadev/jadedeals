@@ -313,13 +313,6 @@ const PromoterResources: React.FC = () => {
               <h1 className="text-4xl font-bold text-gray-900 mb-2">Promoter Resources</h1>
               <p className="text-xl text-gray-600">Your complete guide to affiliate marketing success</p>
             </div>
-            <Link
-              to="/promoter-dashboard"
-              className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 flex items-center space-x-2"
-            >
-              <BarChart3 className="h-5 w-5" />
-              <span>My Dashboard</span>
-            </Link>
           </div>
 
           {/* Quick Stats */}

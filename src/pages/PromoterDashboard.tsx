@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { supabase, Deal, PromoterStats } from '../lib/supabase'
+import { supabase, Deal, PromoterStats, getFollowersOfPromoter, removeFollower } from '../lib/supabase'
 import { 
   Plus, 
   TrendingUp, 
@@ -62,6 +62,9 @@ const PromoterDashboard: React.FC = () => {
     }
   })
 
+  const [followers, setFollowers] = useState<any[]>([]);
+  const [loadingFollowers, setLoadingFollowers] = useState(false);
+
   const ITEMS_PER_PAGE = 10
 
   useEffect(() => {
@@ -69,6 +72,7 @@ const PromoterDashboard: React.FC = () => {
       fetchStats()
       fetchDeals(0, true)
       loadPromoterProfile()
+      fetchFollowers();
     }
   }, [user, profile])
 
@@ -337,6 +341,24 @@ const PromoterDashboard: React.FC = () => {
     }
   }, [user, searchTerm, filterStatus, sortBy])
 
+  const fetchFollowers = async () => {
+    if (!user) return;
+    setLoadingFollowers(true);
+    const { data } = await getFollowersOfPromoter(user.id);
+    setFollowers(data || []);
+    setLoadingFollowers(false);
+  };
+
+  useEffect(() => {
+    if (profile?.user_type === 'promoter') fetchFollowers();
+  }, [profile, user]);
+
+  const handleRemoveFollower = async (shopperId: string) => {
+    if (!user) return;
+    await removeFollower(user.id, shopperId);
+    fetchFollowers();
+  };
+
   const handleLoadMore = () => {
     const nextPage = page + 1
     setPage(nextPage)
@@ -412,17 +434,10 @@ const PromoterDashboard: React.FC = () => {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Analytics Dashboard</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Promoter's Dashboard</h1>
             <p className="text-gray-600 mt-2">Track your deals performance and manage your content</p>
           </div>
           <div className="flex items-center space-x-4">
-            <Link
-              to="/promoter-resources"
-              className="border-2 border-emerald-500 text-emerald-600 px-6 py-3 rounded-lg font-semibold hover:bg-emerald-50 transition-all duration-200 flex items-center space-x-2"
-            >
-              <BookOpen className="h-5 w-5" />
-              <span>Resources</span>
-            </Link>
             <button
               onClick={() => setShowCreateDeal(true)}
               className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 flex items-center space-x-2"
@@ -477,13 +492,22 @@ const PromoterDashboard: React.FC = () => {
                 </div>
               </div>
             </div>
-            <button
-              onClick={() => setShowProfileEdit(true)}
-              className="flex items-center space-x-2 text-gray-600 hover:text-emerald-600 transition-colors"
-            >
-              <Edit className="h-4 w-4" />
-              <span>Edit Profile</span>
-            </button>
+            <div className="flex flex-col items-end space-y-2">
+              <button
+                onClick={() => setShowProfileEdit(true)}
+                className="flex items-center space-x-2 text-gray-600 hover:text-emerald-600 transition-colors"
+              >
+                <Edit className="h-4 w-4" />
+                <span>Edit Profile</span>
+              </button>
+              <button
+                onClick={() => window.location.href = '/followers-management'}
+                className="flex items-center space-x-2 text-gray-600 hover:text-emerald-600 transition-colors"
+              >
+                <Users className="h-4 w-4" />
+                <span>Edit Followers</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -647,6 +671,32 @@ const PromoterDashboard: React.FC = () => {
             </>
           )}
         </div>
+
+        {/* Followers List for Promoters */}
+        {profile?.user_type === 'promoter' && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Your Followers</h2>
+            {loadingFollowers ? (
+              <div className="py-8 text-center">Loading followers...</div>
+            ) : followers.length === 0 ? (
+              <div className="py-8 text-gray-500">No followers yet.</div>
+            ) : (
+              <ul className="divide-y divide-gray-100">
+                {followers.map(f => (
+                  <li key={f.shopper_id} className="flex items-center justify-between py-3">
+                    <span className="font-medium text-gray-900">{f.shopper?.first_name} {f.shopper?.last_name} ({f.shopper?.username})</span>
+                    <button
+                      onClick={() => handleRemoveFollower(f.shopper_id)}
+                      className="px-4 py-1 rounded-lg bg-red-100 text-red-700 font-semibold border border-red-200 hover:bg-red-200 transition-all"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Create Deal Modal */}

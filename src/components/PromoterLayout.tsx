@@ -7,6 +7,8 @@ import HeaderPromoter from './HeaderPromoter';
 
 const sidebarAndSearchRoutes = [
   '/promoter-dashboard',
+  '/promoter-resources',
+  '/followers-management'
   // add more as needed
 ];
 

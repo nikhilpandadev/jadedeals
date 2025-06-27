@@ -24,6 +24,7 @@ import Terms from './pages/Terms'
 import About from './pages/About'
 import Help from './pages/Help'
 import PromoterProfile from './pages/PromoterProfile'
+import FollowersManagement from './pages/FollowersManagement'
 
 function App() {
   return (
@@ -91,6 +92,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <PromoterResources />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/followers-management" 
+              element={
+                <ProtectedRoute>
+                  <FollowersManagement />
                 </ProtectedRoute>
               } 
             />

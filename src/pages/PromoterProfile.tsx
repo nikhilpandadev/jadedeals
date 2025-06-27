@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { supabase, followPromoter, unfollowPromoter, isFollowingPromoter } from '../lib/supabase';
 import DealCard from '../components/DealCard';
 import { getUserAvatar } from '../utils/avatars';
 import { useAuth } from '../contexts/AuthContext';
@@ -12,6 +12,8 @@ const PromoterProfile = () => {
   const [profile, setProfile] = useState<any>(null);
   const [deals, setDeals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isFollowing, setIsFollowing] = useState<boolean>(false);
+  const [followLoading, setFollowLoading] = useState(false);
 
   useEffect(() => {
     console.log('Fetching promoter profile for user:', username);
@@ -49,6 +51,32 @@ const PromoterProfile = () => {
     if (username) fetchProfileAndDeals();
   }, [username, user, navigate]);
 
+  // Check if current user is following this promoter
+  useEffect(() => {
+    const checkFollowing = async () => {
+      if (user && profile?.id && user.id !== profile.id) {
+        setFollowLoading(true);
+        const { isFollowing } = await isFollowingPromoter(user.id, profile.id);
+        setIsFollowing(isFollowing);
+        setFollowLoading(false);
+      }
+    };
+    checkFollowing();
+  }, [user, profile]);
+
+  const handleFollow = async () => {
+    if (!user) return;
+    setFollowLoading(true);
+    if (isFollowing) {
+      await unfollowPromoter(user.id, profile.id);
+      setIsFollowing(false);
+    } else {
+      await followPromoter(user.id, profile.id);
+      setIsFollowing(true);
+    }
+    setFollowLoading(false);
+  };
+
   if (loading) return <div className="py-16 text-center">Loading...</div>;
   if (!profile) return <div className="py-16 text-center">Promoter not found.</div>;
 
@@ -64,6 +92,16 @@ const PromoterProfile = () => {
           {profile.first_name || ''} {profile.last_name || ''}
         </h2>
         {profile.bio && <p className="text-gray-600 mb-2">{profile.bio}</p>}
+        {/* Follow/Unfollow button for shoppers */}
+        {user && user.id !== profile.id && (
+          <button
+            onClick={handleFollow}
+            disabled={followLoading}
+            className={`mt-2 px-6 py-2 rounded-lg font-semibold transition-all duration-200 shadow-sm border-2 ${isFollowing ? 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200' : 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white border-emerald-500 hover:from-emerald-600 hover:to-teal-700'}`}
+          >
+            {followLoading ? '...' : isFollowing ? 'Unfollow' : 'Follow'}
+          </button>
+        )}
         <div className="flex space-x-4 mt-2">
           {profile.website && (
             <a href={profile.website} target="_blank" rel="noopener noreferrer" className="text-emerald-600 underline">Website</a>

@@ -9,7 +9,8 @@ import {
   BarChart3, 
   BookOpen,
   Home,
-  ChevronRight
+  ChevronRight,
+  Users
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -45,8 +46,14 @@ const Sidebar: React.FC = () => {
     { 
       name: 'My Dashboard', 
       path: '/promoter-dashboard', 
-      icon: <BarChart3 className="h-5 w-5" />,
+      icon: <BarChart3 className="h-5 w-5" />, 
       description: 'Analytics & deals'
+    },
+    { 
+      name: 'Followers', 
+      path: '/followers-management', 
+      icon: <Users className="h-5 w-5" />, 
+      description: 'Manage your followers'
     },
     { 
       name: 'Resources', 
