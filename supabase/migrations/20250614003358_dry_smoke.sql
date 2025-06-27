@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS deal_analytics (
 );
 
 CREATE VIEW daily_deal_analytics WITH (security_invoker=on) AS
-SELECT DISTINCT event_type, deal_id, user_id, date(created_at)
+SELECT DISTINCT event_type, deal_id, user_id, date(created_at) as created_at
 FROM deal_analytics;
 
 -- Create deal_saves table for save functionality

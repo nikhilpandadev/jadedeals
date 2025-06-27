@@ -392,6 +392,8 @@ const PromoterDashboard: React.FC = () => {
     </div>
   )
 
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+
   if (!user || profile?.user_type !== 'promoter') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -626,15 +628,7 @@ const PromoterDashboard: React.FC = () => {
                       }
                     }}
                     onEdit={() => {/* TODO: Implement edit */}}
-                    onDelete={async () => {
-                      try {
-                        await supabase.from('deals').delete().eq('id', deal.id)
-                        fetchDeals(0, true)
-                        fetchStats()
-                      } catch (error) {
-                        console.error('Error deleting deal:', error)
-                      }
-                    }}
+                    onDelete={() => setConfirmDeleteId(deal.id)}
                     onViewComments={() => setShowCommentsModal(deal.id)}
                   />
                 ))}
@@ -683,6 +677,42 @@ const PromoterDashboard: React.FC = () => {
           dealId={showCommentsModal}
           onClose={() => setShowCommentsModal(null)}
         />
+      )}
+
+      {/* Confirmation Delete Modal */}
+      {confirmDeleteId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl p-8 max-w-sm w-full">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Delete Deal?</h2>
+            <p className="text-gray-700 mb-6">
+              Are you sure you want to delete this deal? This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-4">
+              <button
+                onClick={() => setConfirmDeleteId(null)}
+                className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    await supabase.from('deals').delete().eq('id', confirmDeleteId)
+                    setConfirmDeleteId(null)
+                    fetchDeals(0, true)
+                    fetchStats()
+                  } catch (error) {
+                    console.error('Error deleting deal:', error)
+                    setConfirmDeleteId(null)
+                  }
+                }}
+                className="px-6 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

@@ -123,9 +123,9 @@ const SignUp: React.FC = () => {
     return true
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('Submitting step:', step)
+    console.log('Submitting step:', step, e)
     if (step < 3) {
       // Don't submit, just go to next step
       return
@@ -288,7 +288,7 @@ const SignUp: React.FC = () => {
             </div>
           )}
 
-          <form onSubmit={handleSubmit}>
+          <form>
             {step === 1 && (
               <div className="space-y-6">
                 <h3 className="text-xl font-semibold text-gray-900 mb-4">Account Information</h3>
@@ -699,7 +699,8 @@ const SignUp: React.FC = () => {
                 </button>
               ) : (
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleSignUp}
                   disabled={loading}
                   className="ml-auto bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-8 py-3 rounded-lg font-semibold hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                 >

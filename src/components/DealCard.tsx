@@ -355,7 +355,7 @@ const DealCard: React.FC<DealCardProps> = ({
                     {deal.promoter?.first_name || deal.promoter?.email?.split('@')[0] || 'Promoter'}
                   </a>
                 ) : (
-                  <span>{deal.promoter?.first_name || 'Promoter'}</span>
+                  <span>{deal.promoter?.username || 'Promoter'}</span>
                 )}
               </div>
             )}

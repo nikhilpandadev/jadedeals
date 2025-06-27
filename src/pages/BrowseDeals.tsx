@@ -144,7 +144,6 @@ const BrowseDeals: React.FC = () => {
           dealsToUse = [...dealsToUse, ...(expiredDeals || [])]
         }
       }
-
       // Fetch promoter profiles separately
       const dealIds = dealsToUse?.map(deal => deal.promoter_id).filter(Boolean) || []
       let promoterProfiles = []
@@ -190,6 +189,7 @@ const BrowseDeals: React.FC = () => {
         }
       })) || []
 
+      console.log('Fetched deals:', processedDeals)
       setDeals(processedDeals)
     } catch (error) {
       console.error('Error fetching deals:', error)
