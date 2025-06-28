@@ -21,6 +21,9 @@ const BrowseDeals: React.FC = () => {
   const categoryFromUrl = searchParams.get('category') || ''
   const timeFilter = searchParams.get('time') || ''
 
+  // Shopper-side sorting state
+  const [sortBy, setSortBy] = useState<'created_at' | 'expiry_date' | 'discount'>('created_at')
+
   // Redirect promoters away from this page
   useEffect(() => {
     if (profile?.user_type === 'promoter') {
@@ -35,6 +38,22 @@ const BrowseDeals: React.FC = () => {
       fetchDeals()
     }
   }, [searchTerm, categoryFromUrl, timeFilter, profile])
+
+  // Add sorting effect for deals
+  useEffect(() => {
+    if (deals.length > 0) {
+      let sorted = [...deals]
+      if (sortBy === 'created_at') {
+        sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      } else if (sortBy === 'expiry_date') {
+        sorted.sort((a, b) => new Date(a.expiry_date).getTime() - new Date(b.expiry_date).getTime())
+      } else if (sortBy === 'discount') {
+        sorted.sort((a, b) => (b.discount_percentage || 0) - (a.discount_percentage || 0))
+      }
+      setDeals(sorted)
+    }
+    // eslint-disable-next-line
+  }, [sortBy])
 
   const fetchDeals = async () => {
     try {
@@ -372,6 +391,19 @@ const BrowseDeals: React.FC = () => {
           </div>
         ) : (
           <>
+            {/* Sorting Controls */}
+            <div className="flex justify-end mb-4">
+              <select
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value as any)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              >
+                <option value="created_at">Newest First</option>
+                <option value="expiry_date">Expiring Soon</option>
+                <option value="discount">Biggest Discount</option>
+              </select>
+            </div>
+
             {/* Deals Grid */}
             <div className="flex flex-col mb-8">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

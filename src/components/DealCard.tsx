@@ -10,8 +10,7 @@ import {
   Store,
   User,
   Check,
-  Heart,
-  HeartOff
+  Heart
 } from 'lucide-react'
 import { Deal, DealInteraction, trackDealEvent } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -195,9 +194,33 @@ const DealCard: React.FC<DealCardProps> = ({
     }
   }
 
+  // Tighter validation for affiliate and image URLs
+  const isValidExternalUrl = (url: string, allowedProtocols = ['https:', 'http:'], allowedExtensions?: string[]): boolean => {
+    try {
+      const parsed = new URL(url)
+      if (!allowedProtocols.includes(parsed.protocol)) return false
+      // Block javascript:, data:, file:, etc.
+      if (/^(javascript|data|file|vbscript):/i.test(parsed.protocol)) return false
+      // Optionally check for allowed file extensions
+      if (allowedExtensions && allowedExtensions.length > 0) {
+        const ext = parsed.pathname.split('.').pop()?.toLowerCase()
+        if (!ext || !allowedExtensions.includes(ext)) return false
+      }
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  const isValidAffiliateLink = (url: string): boolean =>
+    isValidExternalUrl(url, ['https:', 'http:'])
+
   const handleAffiliateClick = async () => {
     try {
-      // Track click event for both logged-in and anonymous users
+      if (!isValidAffiliateLink(deal.affiliate_link)) {
+        alert('Invalid or unsafe affiliate link.');
+        return;
+      }
       await trackDealEvent(deal.id, 'click', user?.id)
       setLocalCounts(prev => ({ ...prev, clicks: prev.clicks + 1 }))
       window.open(deal.affiliate_link, '_blank', 'noopener,noreferrer')
@@ -263,6 +286,8 @@ const DealCard: React.FC<DealCardProps> = ({
             <img
               src={deal.image_url}
               alt={deal.title}
+              referrerPolicy="no-referrer"
+              loading="lazy"
               className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
             />
           </div>
@@ -352,10 +377,10 @@ const DealCard: React.FC<DealCardProps> = ({
                     href={`/promoter/${deal.promoter_username}`}
                     className="text-emerald-600 hover:underline"
                   >
-                    {deal.promoter?.first_name || deal.promoter?.email?.split('@')[0] || 'Promoter'}
+                    {deal.promoter_username || 'Promoter'}
                   </a>
                 ) : (
-                  <span>{deal.promoter?.username || 'Promoter'}</span>
+                  <span>{'Promoter'}</span>
                 )}
               </div>
             )}

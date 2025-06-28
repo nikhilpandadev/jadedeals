@@ -30,6 +30,7 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { getUserAvatar } from '../utils/avatars'
+import { isValidImageUrl, isValidImageFile } from '../utils/imageValidation'
 
 
 const PromoterDashboard: React.FC = () => {
@@ -65,6 +66,9 @@ const PromoterDashboard: React.FC = () => {
   const [followers, setFollowers] = useState<any[]>([]);
   const [loadingFollowers, setLoadingFollowers] = useState(false);
 
+  // Add state for editing deals
+  const [editDeal, setEditDeal] = useState<Deal | null>(null)
+
   const ITEMS_PER_PAGE = 10
 
   useEffect(() => {
@@ -75,6 +79,14 @@ const PromoterDashboard: React.FC = () => {
       fetchFollowers();
     }
   }, [user, profile])
+
+  // Ensure deals are refetched when filters or sorting change
+  useEffect(() => {
+    if (user && profile?.user_type === 'promoter') {
+      fetchDeals(0, true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, filterStatus, sortBy])
 
   const loadPromoterProfile = async () => {
     if (!user) return
@@ -649,13 +661,10 @@ const PromoterDashboard: React.FC = () => {
                     deal={deal}
                     selected={selectedDeals.includes(deal.id)}
                     onSelect={(selected) => {
-                      if (selected) {
-                        setSelectedDeals(prev => [...prev, deal.id])
-                      } else {
-                        setSelectedDeals(prev => prev.filter(id => id !== deal.id))
-                      }
+                      if (selected) setSelectedDeals(prev => [...prev, deal.id])
+                      else setSelectedDeals(prev => prev.filter(id => id !== deal.id))
                     }}
-                    onEdit={() => {/* TODO: Implement edit */}}
+                    onEdit={() => setEditDeal(deal)}
                     onDelete={() => setConfirmDeleteId(deal.id)}
                     onViewComments={() => setShowCommentsModal(deal.id)}
                   />
@@ -675,32 +684,6 @@ const PromoterDashboard: React.FC = () => {
             </>
           )}
         </div>
-
-        {/* Followers List for Promoters */}
-        {profile?.user_type === 'promoter' && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Your Followers</h2>
-            {loadingFollowers ? (
-              <div className="py-8 text-center">Loading followers...</div>
-            ) : followers.length === 0 ? (
-              <div className="py-8 text-gray-500">No followers yet.</div>
-            ) : (
-              <ul className="divide-y divide-gray-100">
-                {followers.map(f => (
-                  <li key={f.shopper_id} className="flex items-center justify-between py-3">
-                    <span className="font-medium text-gray-900">{f.shopper?.first_name} {f.shopper?.last_name} ({f.shopper?.username})</span>
-                    <button
-                      onClick={() => handleRemoveFollower(f.shopper_id)}
-                      className="px-4 py-1 rounded-lg bg-red-100 text-red-700 font-semibold border border-red-200 hover:bg-red-200 transition-all"
-                    >
-                      Remove
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Create Deal Modal */}
@@ -772,6 +755,19 @@ const PromoterDashboard: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Edit Deal Modal */}
+      {editDeal && (
+        <EditDealModal
+          deal={editDeal}
+          onClose={() => setEditDeal(null)}
+          onSuccess={() => {
+            setEditDeal(null)
+            fetchDeals(0, true)
+            fetchStats()
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -800,6 +796,8 @@ const DealRow: React.FC<{
           <img
             src={deal.image_url}
             alt={deal.title}
+            referrerPolicy="no-referrer"
+            loading="lazy"
             className="w-16 h-16 object-cover rounded-lg"
           />
         )}
@@ -1053,7 +1051,7 @@ const CreateDealModal: React.FC<{
   onClose: () => void
   onSuccess: () => void
 }> = ({ onClose, onSuccess }) => {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -1066,8 +1064,10 @@ const CreateDealModal: React.FC<{
     expiry_date: '',
     image_url: ''
   })
+  const [imageFile, setImageFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [imageFileError, setImageFileError] = useState('')
 
   const categories = [
     'Electronics', 'Fashion', 'Home & Garden', 'Health & Beauty',
@@ -1077,16 +1077,42 @@ const CreateDealModal: React.FC<{
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!user) return
-
+    if (!user || !profile) return
     setLoading(true)
     setError('')
-
+    setImageFileError('')
+    // Validate image URL if provided
+    if (formData.image_url && !isValidImageUrl(formData.image_url)) {
+      setError('Image URL must be https and end with .jpg, .jpeg, or .png')
+      setLoading(false)
+      return
+    }
+    // Validate image file if provided
+    if (imageFile && !isValidImageFile(imageFile)) {
+      setImageFileError('Image must be PNG/JPG/JPEG and <= 1MB')
+      setLoading(false)
+      return
+    }
+    let imageUrl = formData.image_url || null
+    // If file is provided, upload to Supabase Storage
+    if (imageFile) {
+      const fileExt = imageFile.name.split('.').pop()
+      const fileName = `${user.id}_${Date.now()}.${fileExt}`
+      const { data, error: uploadError } = await supabase.storage.from('productimages').upload(fileName, imageFile, {
+        cacheControl: '3600',
+        upsert: false
+      })
+      if (uploadError) {
+        setError('Failed to upload image')
+        setLoading(false)
+        return
+      }
+      imageUrl = data ? supabase.storage.from('productimages').getPublicUrl(fileName).data.publicUrl : null
+    }
     try {
       const retailPrice = parseFloat(formData.retail_price)
       const currentPrice = parseFloat(formData.current_price)
       const discountPercentage = Math.round(((retailPrice - currentPrice) / retailPrice) * 100)
-
       const { error } = await supabase.from('deals').insert({
         title: formData.title,
         description: formData.description,
@@ -1097,13 +1123,12 @@ const CreateDealModal: React.FC<{
         category: formData.category,
         marketplace: formData.marketplace,
         promoter_id: user.id,
+        promoter_username: profile.username, // set username
         affiliate_link: formData.affiliate_link,
         expiry_date: formData.expiry_date,
-        image_url: formData.image_url || null
+        image_url: imageUrl
       })
-
       if (error) throw error
-
       onSuccess()
     } catch (error: any) {
       setError(error.message || 'Failed to create deal')
@@ -1135,7 +1160,7 @@ const CreateDealModal: React.FC<{
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Deal Title *
+                Product Name *
               </label>
               <input
                 type="text"
@@ -1280,9 +1305,31 @@ const CreateDealModal: React.FC<{
                 onChange={(e) => setFormData(prev => ({ ...prev, image_url: e.target.value }))}
                 placeholder="https://example.com/image.jpg"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                disabled={!!imageFile}
               />
+              <div className="text-xs text-gray-500 mt-1">Must be https and end with .jpg, .jpeg, or .png</div>
             </div>
-
+            <div className="flex items-center space-x-2">
+              <label className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg font-semibold cursor-pointer hover:shadow-lg hover:from-emerald-600 hover:to-teal-700 transition-all">
+                <span>{imageFile ? 'Change Image' : 'Upload Image'}</span>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg"
+                  className="hidden"
+                  onChange={e => {
+                    const file = e.target.files?.[0] || null
+                    setImageFile(file)
+                    setFormData(prev => ({ ...prev, image_url: '' }))
+                    setImageFileError('')
+                  }}
+                  disabled={!!formData.image_url}
+                />
+              </label>
+              {imageFile && (
+                <span className="text-xs text-gray-700 truncate max-w-[120px]">{imageFile.name}</span>
+              )}
+            </div>
+            {imageFileError && <div className="text-xs text-red-600 mt-1">{imageFileError}</div>}
             <div className="flex justify-end space-x-4 pt-6">
               <button
                 type="button"
@@ -1306,138 +1353,109 @@ const CreateDealModal: React.FC<{
   )
 }
 
-// Comments Modal Component
-const CommentsModal: React.FC<{
-  dealId: string
+// Edit Deal Modal Component
+const EditDealModal: React.FC<{
+  deal: Deal
   onClose: () => void
-}> = ({ dealId, onClose }) => {
-  const { user } = useAuth()
-  const [comments, setComments] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [replyContent, setReplyContent] = useState('')
-  const [replyingTo, setReplyingTo] = useState<string | null>(null)
+  onSuccess: () => void
+}> = ({ deal, onClose, onSuccess }) => {
+  const { user, profile } = useAuth()
+  const [formData, setFormData] = useState({
+    title: deal.title || '',
+    description: deal.description || '',
+    coupon_code: deal.coupon_code || '',
+    retail_price: deal.retail_price?.toString() || '',
+    current_price: deal.current_price?.toString() || '',
+    category: deal.category || '',
+    marketplace: deal.marketplace || '',
+    affiliate_link: deal.affiliate_link || '',
+    expiry_date: deal.expiry_date ? deal.expiry_date.slice(0, 16) : '',
+    image_url: deal.image_url || ''
+  })
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [imageFileError, setImageFileError] = useState('')
 
-  // Fetch comments for the deal
-  useEffect(() => {
-    const fetchComments = async () => {
-      setLoading(true)
-      setError('')
-      try {
-        const { data, error } = await supabase
-          .from('deal_comments')
-          .select('*')
-          .eq('deal_id', dealId)
-          .order('created_at', { ascending: true })
-        if (error) throw error
-        setComments(data || [])
-      } catch (err: any) {
-        setError(err.message || 'Failed to load comments')
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchComments()
-  }, [dealId])
+  const categories = [
+    'Electronics', 'Fashion', 'Home & Garden', 'Health & Beauty',
+    'Sports & Outdoors', 'Books & Media', 'Food & Beverages',
+    'Travel', 'Automotive', 'Toys & Games'
+  ]
 
-  // Post a reply
-  const handleReply = async (parentId: string | null) => {
-    if (!user || !replyContent.trim()) return
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user || !profile) return
+    setLoading(true)
     setError('')
-    try {
-      const { error } = await supabase.from('deal_comments').insert({
-        deal_id: dealId,
-        user_id: user.id,
-        comment: replyContent,
-        parent_id: parentId || null,
-        created_at: new Date().toISOString()
+    setImageFileError('')
+    // Only one of image_url or imageFile can be used
+    if (formData.image_url && imageFile) {
+      setError('Please provide either an image URL or upload an image, not both.')
+      setLoading(false)
+      return
+    }
+    // Validate image URL if provided
+    if (formData.image_url && !isValidImageUrl(formData.image_url)) {
+      setError('Image URL must be https and end with .jpg, .jpeg, or .png')
+      setLoading(false)
+      return
+    }
+    // Validate image file if provided
+    if (imageFile && !isValidImageFile(imageFile)) {
+      setImageFileError('Image must be PNG/JPG/JPEG and <= 1MB')
+      setLoading(false)
+      return
+    }
+    let imageUrl = formData.image_url || null
+    // If file is provided, upload to Supabase Storage
+    if (imageFile) {
+      const fileExt = imageFile.name.split('.').pop()
+      const fileName = `${user.id}_${Date.now()}.${fileExt}`
+      const { data, error: uploadError } = await supabase.storage.from('productimages').upload(fileName, imageFile, {
+        cacheControl: '3600',
+        upsert: false
       })
+      if (uploadError) {
+        setError('Failed to upload image')
+        setLoading(false)
+        return
+      }
+      imageUrl = data ? supabase.storage.from('productimages').getPublicUrl(fileName).data.publicUrl : null
+    }
+    try {
+      const retailPrice = parseFloat(formData.retail_price)
+      const currentPrice = parseFloat(formData.current_price)
+      const discountPercentage = Math.round(((retailPrice - currentPrice) / retailPrice) * 100)
+      const { error } = await supabase.from('deals').update({
+        title: formData.title,
+        description: formData.description,
+        coupon_code: formData.coupon_code || null,
+        retail_price: retailPrice,
+        current_price: currentPrice,
+        discount_percentage: discountPercentage,
+        category: formData.category,
+        marketplace: formData.marketplace,
+        affiliate_link: formData.affiliate_link,
+        expiry_date: formData.expiry_date,
+        image_url: imageUrl,
+        promoter_username: profile.username // ensure username is updated
+      }).eq('id', deal.id)
       if (error) throw error
-      setReplyContent('')
-      setReplyingTo(null)
-      // Refresh comments
-      const { data } = await supabase
-        .from('deal_comments')
-        .select('*')
-        .eq('deal_id', dealId)
-        .order('created_at', { ascending: true })
-      setComments(data || [])
-    } catch (err: any) {
-      setError(err.message || 'Failed to post reply')
+      onSuccess()
+    } catch (error: any) {
+      setError(error.message || 'Failed to update deal')
+    } finally {
+      setLoading(false)
     }
   }
-
-  // Helper to nest comments
-  const nestComments = (comments: any[]) => {
-    const map: Record<string, any> = {}
-    const roots: any[] = []
-    comments.forEach(c => { map[c.id] = { ...c, replies: [] } })
-    comments.forEach(c => {
-      if (c.parent_id && map[c.parent_id]) {
-        map[c.parent_id].replies.push(map[c.id])
-      } else {
-        roots.push(map[c.id])
-      }
-    })
-    return roots
-  }
-
-  const renderComments = (comments: any[], level = 0) => (
-    <div>
-      {comments.map(comment => (
-        <div key={comment.id} className={`mb-4 ml-${level * 6}`}>
-          <div className="flex items-start space-x-3">
-            <img
-              src={getUserAvatar(comment.user_id, comment.user_id)}
-              alt="avatar"
-              className="w-8 h-8 rounded-full border"
-            />
-            <div className="flex-1">
-              <div className="bg-gray-100 rounded-lg px-4 py-2">
-                <div className="text-sm text-gray-900 font-medium">{comment.user_id === user?.id ? 'You' : comment.user_id}</div>
-                <div className="text-gray-700 text-sm mt-1">{comment.comment}</div>
-                <div className="text-xs text-gray-400 mt-1">{new Date(comment.created_at).toLocaleString()}</div>
-              </div>
-              <button
-                className="text-emerald-600 text-xs mt-1 hover:underline"
-                onClick={() => {
-                  setReplyingTo(comment.id)
-                  setReplyContent('')
-                }}
-              >Reply</button>
-              {replyingTo === comment.id && (
-                <div className="mt-2 flex items-center space-x-2">
-                  <input
-                    type="text"
-                    value={replyContent}
-                    onChange={e => setReplyContent(e.target.value)}
-                    className="flex-1 px-3 py-2 border rounded-lg focus:ring-emerald-500 focus:border-emerald-500"
-                    placeholder="Write a reply..."
-                  />
-                  <button
-                    onClick={() => handleReply(comment.id)}
-                    className="px-3 py-2 bg-emerald-500 text-white rounded-lg font-medium hover:bg-emerald-600"
-                  >Send</button>
-                  <button
-                    onClick={() => setReplyingTo(null)}
-                    className="px-2 py-2 text-gray-400 hover:text-gray-600"
-                  ><X className="h-4 w-4" /></button>
-                </div>
-              )}
-              {comment.replies && comment.replies.length > 0 && renderComments(comment.replies, level + 1)}
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  )
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">Deal Comments</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Edit Deal</h2>
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -1445,33 +1463,194 @@ const CommentsModal: React.FC<{
               <X className="h-6 w-6" />
             </button>
           </div>
-          {error && <div className="mb-4 text-red-600 text-sm">{error}</div>}
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-red-600 text-sm">{error}</p>
             </div>
-          ) : (
-            <>
-              {renderComments(nestComments(comments))}
-              {/* Top-level reply */}
-              <div className="mt-6">
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Product Name *
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.title}
+                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="e.g., Apple AirPods Pro (2nd Generation)"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                maxLength={120}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Description *
+              </label>
+              <textarea
+                required
+                value={formData.description}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Describe the deal and what makes it special..."
+                rows={3}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                maxLength={240}
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Category *
+                </label>
+                <select
+                  required
+                  value={formData.category}
+                  onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                >
+                  <option value="">Select category</option>
+                  {categories.map(category => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Marketplace *
+                </label>
                 <input
                   type="text"
-                  value={replyingTo === null ? replyContent : ''}
-                  onChange={e => { if (replyingTo === null) setReplyContent(e.target.value) }}
+                  required
+                  value={formData.marketplace}
+                  onChange={(e) => setFormData(prev => ({ ...prev, marketplace: e.target.value }))}
+                  placeholder="e.g., Amazon, Best Buy, Nike"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                  placeholder="Write a comment..."
                 />
-                <div className="flex justify-end mt-2">
-                  <button
-                    onClick={() => handleReply(null)}
-                    disabled={!replyContent.trim() || replyingTo !== null}
-                    className="px-6 py-2 bg-emerald-500 text-white rounded-lg font-semibold hover:bg-emerald-600 disabled:opacity-50"
-                  >Post Comment</button>
-                </div>
               </div>
-            </>
-          )}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Retail Price *
+                </label>
+                <input
+                  type="number"
+                  required
+                  step="0.01"
+                  min="0"
+                  value={formData.retail_price}
+                  onChange={(e) => setFormData(prev => ({ ...prev, retail_price: e.target.value }))}
+                  placeholder="199.99"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Sale Price *
+                </label>
+                <input
+                  type="number"
+                  required
+                  step="0.01"
+                  min="0"
+                  value={formData.current_price}
+                  onChange={(e) => setFormData(prev => ({ ...prev, current_price: e.target.value }))}
+                  placeholder="149.99"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Coupon Code (Optional)
+              </label>
+              <input
+                type="text"
+                value={formData.coupon_code}
+                onChange={(e) => setFormData(prev => ({ ...prev, coupon_code: e.target.value }))}
+                placeholder="e.g., SAVE20"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Affiliate Link *
+              </label>
+              <input
+                type="url"
+                required
+                value={formData.affiliate_link}
+                onChange={(e) => setFormData(prev => ({ ...prev, affiliate_link: e.target.value }))}
+                placeholder="https://example.com/product"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Expiry Date *
+              </label>
+              <input
+                type="datetime-local"
+                required
+                value={formData.expiry_date}
+                onChange={(e) => setFormData(prev => ({ ...prev, expiry_date: e.target.value }))}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Image URL (Optional)
+              </label>
+              <input
+                type="url"
+                value={formData.image_url}
+                onChange={(e) => setFormData(prev => ({ ...prev, image_url: e.target.value }))}
+                placeholder="https://example.com/image.jpg"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                disabled={!!imageFile}
+              />
+              <div className="text-xs text-gray-500 mt-1">Must be https and end with .jpg, .jpeg, or .png</div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <label className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg font-semibold cursor-pointer hover:shadow-lg hover:from-emerald-600 hover:to-teal-700 transition-all">
+                <span>{imageFile ? 'Change Image' : 'Upload Image'}</span>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg"
+                  className="hidden"
+                  onChange={e => {
+                    const file = e.target.files?.[0] || null
+                    setImageFile(file)
+                    setFormData(prev => ({ ...prev, image_url: '' }))
+                    setImageFileError('')
+                  }}
+                  disabled={!!formData.image_url}
+                />
+              </label>
+              {imageFile && (
+                <span className="text-xs text-gray-700 truncate max-w-[120px]">{imageFile.name}</span>
+              )}
+            </div>
+            {imageFileError && <div className="text-xs text-red-600 mt-1">{imageFileError}</div>}
+            <div className="flex justify-end space-x-4 pt-6">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg font-semibold hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Saving...' : 'Edit Deal'}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
