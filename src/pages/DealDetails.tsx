@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
 import { 
   ExternalLink, 
   Clock, 
@@ -28,7 +28,8 @@ const DealDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [deal, setDeal] = useState<Deal | null>(null)
+  const location = useLocation();
+  const [deal, setDeal] = useState<Deal | null | undefined>(undefined)
   const [similarDeals, setSimilarDeals] = useState<Deal[]>([])
   const [loading, setLoading] = useState(true)
   const [copiedCode, setCopiedCode] = useState(false)
@@ -109,14 +110,14 @@ const DealDetails: React.FC = () => {
         .single()
 
       // Fetch user profiles for comments separately
-      const commentUserIds = data.comments?.map(comment => comment.user_id).filter(Boolean) || []
+      const commentUserIds = data.comments?.map((comment: any)  => comment.user_id).filter(Boolean) || []
       const { data: commentUsers } = await supabase
         .from('user_profiles')
         .select('id, email')
         .in('id', commentUserIds)
 
       // Merge user data with comments
-      const commentsWithUsers = data.comments?.map(comment => ({
+      const commentsWithUsers = data.comments?.map((comment: any)  => ({
         ...comment,
         user: {
           email: commentUsers?.find(u => u.id === comment.user_id)?.email || 'Unknown'
@@ -125,8 +126,8 @@ const DealDetails: React.FC = () => {
 
       const processedDeal = {
         ...data,
-        helpful_count: data.interactions?.filter(i => i.is_helpful === true).length || 0,
-        not_helpful_count: data.interactions?.filter(i => i.is_helpful === false).length || 0,
+        helpful_count: data.interactions?.filter((i: any) => i.is_helpful === true).length || 0,
+        not_helpful_count: data.interactions?.filter((i: any) => i.is_helpful === false).length || 0,
         user_interaction: user?.id ? (data.user_interaction?.[0] || null) : null,
         comments: commentsWithUsers,
         promoter: {
@@ -199,8 +200,8 @@ const DealDetails: React.FC = () => {
 
       const processedDeals = dealsToUse?.map(deal => ({
         ...deal,
-        helpful_count: deal.interactions?.filter(i => i.is_helpful === true).length || 0,
-        not_helpful_count: deal.interactions?.filter(i => i.is_helpful === false).length || 0,
+        helpful_count: deal.interactions?.filter((i: any)  => i.is_helpful === true).length || 0,
+        not_helpful_count: deal.interactions?.filter((i: any)  => i.is_helpful === false).length || 0,
         promoter: {
           email: promoterProfiles?.find(p => p.id === deal.promoter_id)?.email || 'Unknown'
         }
@@ -328,7 +329,7 @@ const DealDetails: React.FC = () => {
     )
   }
 
-  if (!deal) {
+  if (!loading && deal === null) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -345,26 +346,39 @@ const DealDetails: React.FC = () => {
     )
   }
 
+  if (!deal) return null;
+
   const timeRemaining = getTimeRemaining(deal.expiry_date)
   const isExpired = timeRemaining === 'Expired'
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Back Button */}
-        <Link
-          to="/browse-deals"
-          className="inline-flex items-center space-x-2 text-gray-600 hover:text-emerald-600 mb-6 transition-colors"
-        >
-          <ArrowLeft className="h-5 w-5" />
-          <span>Back to Deals</span>
-        </Link>
+        {/* Back Button - only show if navigated from Browse Deals */}
+        {location.state?.fromBrowseDeals && (
+          <Link
+            to="/browse-deals"
+            className="inline-flex items-center space-x-2 text-gray-600 hover:text-emerald-600 mb-6 transition-colors"
+          >
+            <ArrowLeft className="h-5 w-5" />
+            <span>Back to Deals</span>
+          </Link>
+        )}
 
         {/* Main Deal Details */}
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-8">
           <div className="p-8">
             {/* Header */}
             <div className="flex items-start justify-between mb-6">
+              {deal.image_url && (
+                <img
+                  src={deal.image_url}
+                  alt={deal.title}
+                  className="w-28 h-28 object-cover rounded-xl mr-6 border border-gray-100 shadow-sm"
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                />
+              )}
               <div className="flex-1">
                 <h1 className="text-3xl font-bold text-gray-900 mb-4">{deal.title}</h1>
                 <p className="text-lg text-gray-600 leading-relaxed mb-6">{deal.description}</p>
@@ -451,6 +465,13 @@ const DealDetails: React.FC = () => {
                   <div className="font-medium">{new Date(deal.created_at).toLocaleDateString()}</div>
                 </div>
               </div>
+              <div className="flex items-center space-x-3">
+                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
+                <div>
+                  <div className="text-sm text-gray-500">Saved</div>
+                  <div className="font-medium">{deal.save_count || 0}</div>
+                </div>
+              </div>
             </div>
 
             {/* Action Button */}
@@ -488,7 +509,7 @@ const DealDetails: React.FC = () => {
                   <div className="flex items-center space-x-6">
                     <div className="flex items-center space-x-2">
                       <button
-                        onClick={() => handleInteraction(deal.id, { is_helpful: helpfulState === true ? null : true })}
+                        onClick={() => handleInteraction(deal.id, { is_helpful: helpfulState === true ? undefined : true })}
                         className={`flex items-center space-x-2 px-4 py-2 rounded-full transition-colors ${
                           helpfulState === true
                             ? 'bg-emerald-100 text-emerald-700'
@@ -499,7 +520,7 @@ const DealDetails: React.FC = () => {
                         <span>{localCounts.helpful}</span>
                       </button>
                       <button
-                        onClick={() => handleInteraction(deal.id, { is_helpful: helpfulState === false ? null : false })}
+                        onClick={() => handleInteraction(deal.id, { is_helpful: helpfulState === false ? undefined : false })}
                         className={`flex items-center space-x-2 px-4 py-2 rounded-full transition-colors ${
                           helpfulState === false
                             ? 'bg-red-100 text-red-700'

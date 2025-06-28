@@ -10,12 +10,14 @@ import {
   Store,
   User,
   Check,
-  Heart
+  Heart,
+  Lock
 } from 'lucide-react'
 import { Deal, DealInteraction, trackDealEvent } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import ShareModal from './ShareModal'
+import { Link, useNavigate } from 'react-router-dom'
 
 interface DealCardProps {
   deal: Deal
@@ -51,6 +53,7 @@ const DealCard: React.FC<DealCardProps> = ({
     views: deal.view_count || 0,
     clicks: deal.click_count || 0
   })
+  const navigate = useNavigate()
 
   const getDiscountColor = (percentage: number) => {
     if (percentage >= 50) return 'bg-red-500'
@@ -255,7 +258,7 @@ const DealCard: React.FC<DealCardProps> = ({
       onComment(deal.id)
     } else {
       // Navigate to deal details page
-      window.location.href = `/deal/${deal.id}`
+      navigate(`/deal/${deal.id}`, { state: { fromBrowseDeals: true } })
     }
   }
 
@@ -297,10 +300,10 @@ const DealCard: React.FC<DealCardProps> = ({
         <div className="p-6 pb-4">
           <div className="flex items-start justify-between mb-3">
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2" title={deal.title}>
                 {deal.title}
               </h3>
-              <p className="text-gray-600 text-sm line-clamp-3 mb-3">
+              <p className="text-gray-600 text-sm line-clamp-3 mb-3" title={deal.description}>
                 {deal.description}
               </p>
             </div>
@@ -340,7 +343,7 @@ const DealCard: React.FC<DealCardProps> = ({
           </div>
 
           {/* Coupon Code */}
-          {deal.coupon_code && (
+          {deal.coupon_code && showFullCard && (
             <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-3 mb-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">Coupon Code:</span>
@@ -390,19 +393,18 @@ const DealCard: React.FC<DealCardProps> = ({
             </div>
           </div>
 
-          {/* Action Button */}
           <button
-            onClick={handleAffiliateClick}
-            disabled={isExpired}
-            className={`w-full py-3 px-4 rounded-lg font-semibold transition-all duration-200 flex items-center justify-center space-x-2 ${
-              isExpired 
-                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                : 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:shadow-lg transform hover:-translate-y-0.5'
-            }`}
-          >
-            <span>{isExpired ? 'Deal Expired' : 'Get This Deal'}</span>
-            {!isExpired && <ExternalLink className="h-4 w-4" />}
-          </button>
+              onClick={handleAffiliateClick}
+              disabled={isExpired}
+              className={`w-full py-3 px-4 rounded-lg font-semibold transition-all duration-200 flex items-center justify-center space-x-2 ${
+                isExpired 
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:shadow-lg transform hover:-translate-y-0.5'
+              }`}
+            >
+              <span>{isExpired ? 'Deal Expired' : 'Get This Deal'}</span>
+              {!isExpired && <ExternalLink className="h-4 w-4" />}
+            </button>
         </div>
 
         {/* Interaction Section */}
