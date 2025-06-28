@@ -25,6 +25,7 @@ import About from './pages/About'
 import Help from './pages/Help'
 import PromoterProfile from './pages/PromoterProfile'
 import FollowersManagement from './pages/FollowersManagement'
+import PromoterFollowsDeals from './pages/PromoterFollowsDeals'
 
 function App() {
   return (
@@ -38,6 +39,11 @@ function App() {
             <Route path="/signup" element={<SignUp />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/browse-deals" element={<BrowseDeals />} />
+            <Route path="/promoter-follows-deals" element={
+              <ProtectedRoute>
+                <PromoterFollowsDeals />
+              </ProtectedRoute>
+            } />
             <Route path="/categories" element={<Categories />} />
             <Route path="/deal/:id" element={<DealDetails />} />
             <Route path="/promoters" element={<ForPromoters />} />

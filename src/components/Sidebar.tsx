@@ -29,6 +29,12 @@ const Sidebar: React.FC = () => {
       description: 'Discover amazing deals'
     },
     { 
+      name: "Your Promoters' Deals", 
+      path: '/promoter-follows-deals', 
+      icon: <Users className="h-5 w-5" />, 
+      description: "Deals from promoters you follow"
+    },
+    { 
       name: 'Categories', 
       path: '/categories', 
       icon: <Grid3X3 className="h-5 w-5" />,

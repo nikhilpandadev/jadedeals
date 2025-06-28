@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
-import { supabase, Deal, getPromotersFollowedByShopper } from '../lib/supabase'
+import { supabase, Deal } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import DealCard from '../components/DealCard'
 import { ArrowRight, Lock, X, AlertCircle } from 'lucide-react'
@@ -11,9 +11,7 @@ const BrowseDeals: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams()
   const [deals, setDeals] = useState<Deal[]>([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'all' | 'promoters'>('all')
-  const [promoterDeals, setPromoterDeals] = useState<Deal[]>([])
-  const [loadingPromoterDeals, setLoadingPromoterDeals] = useState(false)
+  // const [tab, setTab] = useState<'all' | 'promoters'>('all')
 
   // Configuration for free deals limit
   const FREE_DEALS_LIMIT = 10
@@ -166,33 +164,33 @@ const BrowseDeals: React.FC = () => {
     }
   }
 
-  const fetchPromotersDeals = async () => {
-    if (!user) return
-    setLoadingPromoterDeals(true)
-    const { data, error } = await getPromotersFollowedByShopper(user.id)
-    if (error) {
-      setLoadingPromoterDeals(false)
-      return
-    }
-    const promoterIds = data?.map((f: any) => f.promoter_id) || []
-    if (promoterIds.length === 0) {
-      setPromoterDeals([])
-      setLoadingPromoterDeals(false)
-      return
-    }
-    const { data: dealsData } = await supabase
-      .from('deals')
-      .select('*')
-      .in('promoter_id', promoterIds)
-      .order('created_at', { ascending: false })
+  // const fetchPromotersDeals = async () => {
+  //   if (!user) return
+  //   setLoadingPromoterDeals(true)
+  //   const { data, error } = await getPromotersFollowedByShopper(user.id)
+  //   if (error) {
+  //     setLoadingPromoterDeals(false)
+  //     return
+  //   }
+  //   const promoterIds = data?.map((f: any) => f.promoter_id) || []
+  //   if (promoterIds.length === 0) {
+  //     setPromoterDeals([])
+  //     setLoadingPromoterDeals(false)
+  //     return
+  //   }
+  //   const { data: dealsData } = await supabase
+  //     .from('deals')
+  //     .select('*')
+  //     .in('promoter_id', promoterIds)
+  //     .order('created_at', { ascending: false })
 
-    setPromoterDeals(dealsData || [])
-    setLoadingPromoterDeals(false)
-  }
+  //   setPromoterDeals(dealsData || [])
+  //   setLoadingPromoterDeals(false)
+  // }
 
-  useEffect(() => {
-    if (tab === 'promoters') fetchPromotersDeals()
-  }, [tab, user])
+  // useEffect(() => {
+  //   if (tab === 'promoters') fetchPromotersDeals()
+  // }, [tab, user])
 
   const handleInteraction = async (dealId: string, interaction: Partial<any>) => {
     if (!user) return
@@ -376,46 +374,18 @@ const BrowseDeals: React.FC = () => {
           <>
             {/* Deals Grid */}
             <div className="flex flex-col mb-8">
-              <div className="flex space-x-4 mb-6">
-                <button
-                  className={`px-4 py-2 rounded-lg font-semibold border-2 transition-all duration-200 ${tab === 'all' ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white border-emerald-500' : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'}`}
-                  onClick={() => setTab('all')}
-                >
-                  All Deals
-                </button>
-                <button
-                  className={`px-4 py-2 rounded-lg font-semibold border-2 transition-all duration-200 ${tab === 'promoters' ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white border-emerald-500' : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'}`}
-                  onClick={() => setTab('promoters')}
-                >
-                  Your Promoters' Deals
-                </button>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {visibleDeals.map((deal) => (
+                  <DealCard
+                    key={deal.id}
+                    deal={deal}
+                    onInteraction={handleInteraction}
+                    onComment={handleComment}
+                    onShare={handleShare}
+                    showFullCard={!!user}
+                  />
+                ))}
               </div>
-              {tab === 'all' ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {visibleDeals.map((deal) => (
-                    <DealCard
-                      key={deal.id}
-                      deal={deal}
-                      onInteraction={handleInteraction}
-                      onComment={handleComment}
-                      onShare={handleShare}
-                      showFullCard={!!user}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div>
-                  {loadingPromoterDeals ? (
-                    <div className="py-16 text-center">Loading...</div>
-                  ) : promoterDeals.length === 0 ? (
-                    <div className="py-16 text-center text-gray-500">No deals from your followed promoters yet.</div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {promoterDeals.map(deal => <DealCard key={deal.id} deal={deal} showPromoter={true} />)}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
 
             {/* Call to Action for Non-Users */}
