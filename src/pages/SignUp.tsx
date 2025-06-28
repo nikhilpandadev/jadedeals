@@ -6,12 +6,12 @@ import { useAuth } from '../contexts/AuthContext'
 const SignUp: React.FC = () => {
   const [formData, setFormData] = useState({
     email: '',
-    username: '', // NEW: username field
+    username: '',
     password: '',
     confirmPassword: '',
-    userType: 'Shopper' as 'Shopper' | 'promoter',
-    firstName: '', // NEW
-    lastName: '',  // NEW
+    userType: '' as '' | 'Shopper' | 'promoter', // No default selection
+    firstName: '',
+    lastName: '',
     ageGroup: '',
     city: '',
     country: '',
@@ -29,6 +29,7 @@ const SignUp: React.FC = () => {
   const [step, setStep] = useState(1)
   const [usernameChecking, setUsernameChecking] = useState(false) // NEW
   const [usernameAvailable, setUsernameAvailable] = useState<boolean|null>(null) // NEW
+  const [accountTypeInfoOpen, setAccountTypeInfoOpen] = useState<boolean>(false)
 
   const { signUp, signInWithGoogle, signInWithFacebook, user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
@@ -36,7 +37,6 @@ const SignUp: React.FC = () => {
   // Redirect if already authenticated
   useEffect(() => {
     if (!authLoading && user) {
-      console.log('User already authenticated, redirecting to dashboard')
       navigate('/dashboard', { replace: true })
     }
   }, [user, authLoading, navigate])
@@ -88,6 +88,10 @@ const SignUp: React.FC = () => {
   }
 
   const validateStep1 = () => {
+    if (!formData.userType) {
+      setError('Please select an account type (Shopper or Promoter)')
+      return false
+    }
     if (!formData.email) {
       setError('Email is required')
       return false
@@ -125,7 +129,6 @@ const SignUp: React.FC = () => {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('Submitting step:', step, e)
     if (step < 3) {
       // Don't submit, just go to next step
       return
@@ -136,24 +139,8 @@ const SignUp: React.FC = () => {
     setLoading(true)
     setError('')
     try {
-      console.log('Submitting signup form with data:', {
-        email: formData.email,
-        username: formData.username, // NEW
-        userType: formData.userType,
-        firstName: formData.firstName, // NEW
-        lastName: formData.lastName,   // NEW
-        ageGroup: formData.ageGroup,
-        city: formData.city,
-        country: formData.country,
-        zipCode: formData.zipCode,
-        incomeGroup: formData.incomeGroup,
-        preferredCategories: formData.preferredCategories,
-        shoppingFrequency: formData.shoppingFrequency,
-        priceSensitivity: formData.priceSensitivity
-      })
-
       await signUp(formData.email, formData.password, {
-        user_type: formData.userType,
+        user_type: formData.userType || undefined,
         username: formData.username, // NEW: send username
         first_name: formData.firstName || '', // NEW
         last_name: formData.lastName || '',   // NEW
@@ -166,8 +153,7 @@ const SignUp: React.FC = () => {
         shopping_frequency: formData.shoppingFrequency || '',
         price_sensitivity: formData.priceSensitivity
       })
-      
-      console.log('Sign up completed successfully')
+
       navigate('/dashboard', { replace: true })
     } catch (error: any) {
       console.error('Signup error:', error)
@@ -205,6 +191,10 @@ const SignUp: React.FC = () => {
   }
 
   const handleGoogleSignIn = async () => {
+    if (!formData.userType) {
+      setError('Please select an account type (Shopper or Promoter)')
+      return
+    }
     try {
       setError('')
       await signInWithGoogle()
@@ -215,6 +205,10 @@ const SignUp: React.FC = () => {
   }
 
   const handleFacebookSignIn = async () => {
+    if (!formData.userType) {
+      setError('Please select an account type (Shopper or Promoter)')
+      return
+    }
     try {
       setError('')
       await signInWithFacebook()
@@ -294,7 +288,17 @@ const SignUp: React.FC = () => {
                 <h3 className="text-xl font-semibold text-gray-900 mb-4">Account Information</h3>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Account Type</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                    Account Type <span className="text-red-500">*</span>
+                    <button
+                      type="button"
+                      className="text-gray-400 hover:text-emerald-600 focus:outline-none"
+                      aria-label="Learn more about account types"
+                      onClick={e => { e.preventDefault(); setAccountTypeInfoOpen(true) }}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" strokeWidth="2" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 16v-4m0-4h.01" /></svg>
+                    </button>
+                  </label>
                   <div className="grid grid-cols-2 gap-4">
                     <label className="relative">
                       <input
@@ -310,11 +314,11 @@ const SignUp: React.FC = () => {
                           ? 'border-emerald-500 bg-emerald-50' 
                           : 'border-gray-300 hover:border-gray-400'
                       }`}>
-                        <div className="text-center">
-                          <User className="h-8 w-8 mx-auto mb-2 text-emerald-600" />
-                          <div className="font-medium">Shopper</div>
-                          <div className="text-sm text-gray-500">Browse and discover deals</div>
+                        <div className="flex justify-center items-center mb-2">
+                          <User className="h-8 w-8 text-emerald-600" />
                         </div>
+                        <div className="font-medium">Shopper</div>
+                        <div className="text-sm text-gray-500">Browse and discover deals</div>
                       </div>
                     </label>
                     <label className="relative">
@@ -331,11 +335,11 @@ const SignUp: React.FC = () => {
                           ? 'border-emerald-500 bg-emerald-50' 
                           : 'border-gray-300 hover:border-gray-400'
                       }`}>
-                        <div className="text-center">
-                          <DollarSign className="h-8 w-8 mx-auto mb-2 text-emerald-600" />
-                          <div className="font-medium">Promoter</div>
-                          <div className="text-sm text-gray-500">Share and promote deals</div>
+                        <div className="flex justify-center items-center mb-2">
+                          <DollarSign className="h-8 w-8 text-emerald-600" />
                         </div>
+                        <div className="font-medium">Promoter</div>
+                        <div className="text-sm text-gray-500">Share and promote deals</div>
                       </div>
                     </label>
                   </div>
@@ -727,6 +731,29 @@ const SignUp: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Account type info modal/popover */}
+      {accountTypeInfoOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
+          <div className="bg-white border border-emerald-200 rounded-xl shadow-xl p-6 max-w-lg w-full relative">
+            <button className="absolute top-2 right-2 text-gray-400 hover:text-emerald-600 text-2xl" onClick={() => setAccountTypeInfoOpen(false)} aria-label="Close info">&times;</button>
+            <div className="mb-4">
+              <div className="flex items-center mb-2 font-semibold text-emerald-700">
+                Shopper Account
+              </div>
+              <div className="text-gray-700 text-sm mb-4">
+                Choose this if you want to browse, save, and discover the best deals from your favorite brands and retailers. Shoppers can follow promoters, comment, and personalize their deal feed.
+              </div>
+              <div className="flex items-center mb-2 font-semibold text-emerald-700">
+                Promoter Account
+              </div>
+              <div className="text-gray-700 text-sm">
+                Choose this if you want to share, promote, and earn commission from affiliate deals. Promoters can build a following, post deals, and access special analytics and resources.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

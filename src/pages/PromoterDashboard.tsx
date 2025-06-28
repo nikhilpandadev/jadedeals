@@ -369,6 +369,10 @@ const PromoterDashboard: React.FC = () => {
     if (!selectedDeals.length) return
 
     try {
+      // Delete related analytics and comments for each deal
+      await supabase.from('daily_deal_analytics').delete().in('deal_id', selectedDeals)
+      await supabase.from('deal_comments').delete().in('deal_id', selectedDeals)
+      // Now delete the deals
       const { error } = await supabase
         .from('deals')
         .delete()
@@ -747,6 +751,10 @@ const PromoterDashboard: React.FC = () => {
               <button
                 onClick={async () => {
                   try {
+                    // Delete related analytics and comments for this deal
+                    await supabase.from('daily_deal_analytics').delete().eq('deal_id', confirmDeleteId)
+                    await supabase.from('deal_comments').delete().eq('deal_id', confirmDeleteId)
+                    // Now delete the deal
                     await supabase.from('deals').delete().eq('id', confirmDeleteId)
                     setConfirmDeleteId(null)
                     fetchDeals(0, true)
@@ -888,7 +896,7 @@ const ProfileEditModal: React.FC<{
               <input
                 type="text"
                 value={profileData.first_name}
-                onChange={(e) => setProfileData(prev => ({ ...prev, first_name: e.target.value }))}
+                onChange={(e) => setProfileData((prev: typeof profileData) => ({ ...prev, first_name: e.target.value }))}
                 placeholder="John"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
               />
@@ -900,7 +908,7 @@ const ProfileEditModal: React.FC<{
               <input
                 type="text"
                 value={profileData.last_name}
-                onChange={(e) => setProfileData(prev => ({ ...prev, last_name: e.target.value }))}
+                onChange={(e) => setProfileData((prev: typeof profileData) => ({ ...prev, last_name: e.target.value }))}
                 placeholder="Doe"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
               />
@@ -914,7 +922,7 @@ const ProfileEditModal: React.FC<{
               </label>
               <textarea
                 value={profileData.bio}
-                onChange={(e) => setProfileData(prev => ({ ...prev, bio: e.target.value }))}
+                onChange={(e) => setProfileData((prev: typeof profileData) => ({ ...prev, bio: e.target.value }))}
                 placeholder="Tell your audience about yourself and what kind of deals you share..."
                 rows={4}
                 maxLength={500}
@@ -930,7 +938,7 @@ const ProfileEditModal: React.FC<{
               <input
                 type="url"
                 value={profileData.website}
-                onChange={(e) => setProfileData(prev => ({ ...prev, website: e.target.value }))}
+                onChange={(e) => setProfileData((prev: typeof profileData) => ({ ...prev, website: e.target.value }))}
                 placeholder="https://your-website.com"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
               />
@@ -948,7 +956,7 @@ const ProfileEditModal: React.FC<{
                   <input
                     type="url"
                     value={profileData.social_links.twitter}
-                    onChange={(e) => setProfileData(prev => ({
+                    onChange={(e) => setProfileData((prev: typeof profileData) => ({
                       ...prev,
                       social_links: {
                         ...prev.social_links,
@@ -967,7 +975,7 @@ const ProfileEditModal: React.FC<{
                   <input
                     type="url"
                     value={profileData.social_links.instagram}
-                    onChange={(e) => setProfileData(prev => ({
+                    onChange={(e) => setProfileData((prev: typeof profileData) => ({
                       ...prev,
                       social_links: {
                         ...prev.social_links,
@@ -986,7 +994,7 @@ const ProfileEditModal: React.FC<{
                   <input
                     type="url"
                     value={profileData.social_links.youtube}
-                    onChange={(e) => setProfileData(prev => ({
+                    onChange={(e) => setProfileData((prev: typeof profileData) => ({
                       ...prev,
                       social_links: {
                         ...prev.social_links,
@@ -1005,7 +1013,7 @@ const ProfileEditModal: React.FC<{
                   <input
                     type="url"
                     value={profileData.social_links.tiktok}
-                    onChange={(e) => setProfileData(prev => ({
+                    onChange={(e) => setProfileData((prev: typeof profileData) => ({
                       ...prev,
                       social_links: {
                         ...prev.social_links,

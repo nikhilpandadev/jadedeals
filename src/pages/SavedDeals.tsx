@@ -144,7 +144,6 @@ const SavedDeals: React.FC = () => {
 
   const handleComment = (dealId: string) => {
     // TODO: Implement comment modal/functionality
-    console.log('Comment on deal:', dealId)
   }
 
   const handleShare = async (dealId: string) => {
@@ -166,8 +165,6 @@ const SavedDeals: React.FC = () => {
       // Copy deal link to clipboard
       const dealUrl = `${window.location.origin}/deal/${dealId}`
       await navigator.clipboard.writeText(dealUrl)
-      
-      console.log('Deal link copied to clipboard')
     } catch (error) {
       console.error('Error sharing deal:', error)
     }

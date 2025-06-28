@@ -16,7 +16,6 @@ const PromoterProfile = () => {
   const [followLoading, setFollowLoading] = useState(false);
 
   useEffect(() => {
-    console.log('Fetching promoter profile for user:', username);
     if (!user) {
       navigate('/', { replace: true });
       return;

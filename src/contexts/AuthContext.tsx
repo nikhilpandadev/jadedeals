@@ -50,8 +50,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           return
         }
-
-        console.log('Initial session check:', session ? 'Found session' : 'No session')
         
         if (mounted) {
           setSession(session)
@@ -79,9 +77,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        console.log('Auth state changed:', event, session ? 'Session exists' : 'No session')
-        
+      (event, session) => { 
         if (!mounted) return
 
         setSession(session)
@@ -99,8 +95,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setProfile(null)
           }
           if (event === 'SIGNED_OUT') {
-            console.log('User signed out, clearing state')
-            // Clear all local state on sign out
             setProfile(null)
             setUser(null)
             setSession(null)
@@ -205,8 +199,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   const signUp = async (email: string, password: string, userData: Partial<UserProfile>) => {
-    console.log('Starting signup process for:', email)
-    
     try {
       // First, sign up the user
       const { data, error } = await supabase.auth.signUp({
@@ -222,11 +214,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw error
       }
 
-      console.log('Signup response:', data)
-
       if (data.user) {
-        console.log('User created successfully, creating profile...')
-        
         // Create user profile
         const profileData = {
           id: data.user.id,
@@ -245,8 +233,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           price_sensitivity: userData.price_sensitivity || 'Mid-range',
         }
 
-        console.log('Creating profile with data:', profileData)
-
         const { data: profileResult, error: profileError } = await supabase
           .from('user_profiles')
           .insert([profileData])
@@ -258,7 +244,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           throw new Error(`Failed to create user profile: ${profileError.message}`)
         }
 
-        console.log('Profile created successfully:', profileResult)
         setProfile(profileResult)
       } else {
         console.error('No user returned from signup')
@@ -271,7 +256,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   const signIn = async (email: string, password: string) => {
-    console.log('Attempting to sign in with:', email)
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -281,9 +265,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Sign in error:', error)
       throw error
     }
-
-    console.log('Sign in successful')
-    // The auth state change listener will handle setting user/profile state
   }
 
   const signInWithGoogle = async () => {
@@ -321,39 +302,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Reset password error:', error)
       throw error
     }
-
-    console.log('Password reset email sent successfully')
   }
 
   const signOut = async () => {
-    console.log('Starting sign out process...')
-    
     let retryCount = 0
     const maxRetries = 3
     
     const attemptSignOut = async (): Promise<void> => {
       try {
-        console.log(`Sign out attempt ${retryCount + 1}/${maxRetries}`)
-        
-        // Clear local state immediately to prevent UI flickering
-        console.log('Clearing local state...')
         setUser(null)
         setProfile(null)
         setSession(null)
         
         // Clear all storage immediately
         clearAllStorage()
-        
-        // Sign out from Supabase with global scope to clear all sessions
-        console.log('Signing out from Supabase...')
         const { error } = await supabase.auth.signOut({ scope: 'global' })
         
         if (error) {
           console.error('Supabase sign out error:', error)
           throw error
         }
-        
-        console.log('Sign out completed successfully')
         
         // Force a small delay to ensure cleanup is complete
         await new Promise(resolve => setTimeout(resolve, 100))
@@ -363,7 +331,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         retryCount++
         
         if (retryCount < maxRetries) {
-          console.log(`Retrying sign out in 1 second... (attempt ${retryCount + 1}/${maxRetries})`)
           await new Promise(resolve => setTimeout(resolve, 1000))
           return attemptSignOut()
         } else {

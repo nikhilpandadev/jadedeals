@@ -23,7 +23,10 @@ const ProfileSettings: React.FC = () => {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
   const [showPasswordSection, setShowPasswordSection] = useState(false)
-  
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [deleteReason, setDeleteReason] = useState<string | undefined>()
+
   const [formData, setFormData] = useState({
     email: '',
     userType: 'Shopper' as 'Shopper' | 'promoter',
@@ -186,6 +189,73 @@ const ProfileSettings: React.FC = () => {
       setMessage({ type: 'error', text: error.message || 'Failed to update password' })
     } finally {
       setSaving(false)
+    }
+  }
+
+  // --- Delete Account Modal ---
+  const DeleteAccountModal: React.FC<{
+    open: boolean
+    onClose: () => void
+    onDelete: () => void
+    disabled?: boolean
+    reason?: string
+  }> = ({ open, onClose, onDelete, disabled, reason }) => {
+    if (!open) return null
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-sm w-full">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Delete Account?</h2>
+          <p className="text-gray-700 mb-6">
+            Are you sure you want to delete your account? This action cannot be undone.
+          </p>
+          {reason && <div className="mb-4 text-red-600 text-sm">{reason}</div>}
+          <div className="flex justify-end space-x-4">
+            <button
+              onClick={onClose}
+              className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onDelete}
+              disabled={disabled}
+              className="px-6 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition-colors disabled:opacity-50"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const handleDeleteAccount = async () => {
+    if (!user || !profile) return
+    setDeleteLoading(true)
+    setDeleteReason(undefined)
+    try {
+      if (profile.user_type === 'promoter') {
+        // Check if promoter has any deals
+        const { data: deals, error } = await supabase.from('deals').select('id').eq('promoter_id', user.id)
+        if (error) throw error
+        if (deals && deals.length > 0) {
+          setDeleteReason('You must delete all your deals before deleting your account.')
+          setDeleteLoading(false)
+          return
+        }
+      }
+      // Delete user profile
+      const { error: profileError } = await supabase.from('user_profiles').delete().eq('id', user.id)
+      if (profileError) throw profileError
+      // Optionally: delete from auth (if using Supabase Auth)
+      if (supabase.auth && supabase.auth.signOut) {
+        await supabase.auth.signOut()
+      }
+      window.location.href = '/'
+    } catch (err: any) {
+      setDeleteReason(err.message || 'Failed to delete account.')
+    } finally {
+      setDeleteLoading(false)
     }
   }
 
@@ -588,9 +658,37 @@ const ProfileSettings: React.FC = () => {
                 </form>
               </div>
             )}
+
+            {/* Delete Account Section */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <div className="flex items-center space-x-3 mb-6">
+                <User className="h-6 w-6 text-red-600" />
+                <h2 className="text-xl font-bold text-gray-900">Delete Account</h2>
+              </div>
+              <p className="text-gray-700 mb-4">
+                Once you delete your account, there is no going back. Please be certain.
+              </p>
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  className="px-6 py-3 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition-colors"
+                >
+                  Delete Account
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Delete Account Modal */}
+      <DeleteAccountModal
+        open={showDeleteModal}
+        onClose={() => { setShowDeleteModal(false); setDeleteReason(undefined); }}
+        onDelete={handleDeleteAccount}
+        disabled={deleteLoading || !!deleteReason}
+        reason={deleteReason}
+      />
     </div>
   )
 }

@@ -41,7 +41,7 @@ const DealComments: React.FC<DealCommentsProps> = ({
 
       // If that fails, fall back to a manual join approach
       if (error && error.message.includes('relationship')) {
-        console.log('Direct relationship failed, trying manual approach...')
+        console.error('Direct relationship failed, trying manual approach...')
         
         const { data: commentsData, error: commentsError } = await supabase
           .from('deal_comments')

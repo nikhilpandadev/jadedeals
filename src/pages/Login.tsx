@@ -23,7 +23,6 @@ const Login: React.FC = () => {
   // Redirect if already authenticated
   useEffect(() => {
     if (!authLoading && user) {
-      console.log('User already authenticated, redirecting to:', from)
       navigate(from, { replace: true })
     }
   }, [user, authLoading, navigate, from])
@@ -34,9 +33,7 @@ const Login: React.FC = () => {
     setError('')
 
     try {
-      console.log('Submitting login form')
       await signIn(email, password)
-      console.log('Sign in completed, navigating to:', from)
       // Navigate after successful sign in
       navigate(from, { replace: true })
     } catch (error: any) {
