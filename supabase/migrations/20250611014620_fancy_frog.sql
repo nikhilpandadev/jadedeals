@@ -256,7 +256,9 @@ CREATE INDEX IF NOT EXISTS idx_user_deal_views_session_id ON user_deal_views(ses
 
 -- Create function to update deal counters
 CREATE OR REPLACE FUNCTION update_deal_counters()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+SECURITY DEFINER
+AS $$
 BEGIN
   IF TG_TABLE_NAME = 'deal_interactions' THEN
     IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN

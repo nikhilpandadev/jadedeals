@@ -224,6 +224,7 @@ const DealCard: React.FC<DealCardProps> = ({
         alert('Invalid or unsafe affiliate link.');
         return;
       }
+
       await trackDealEvent(deal.id, 'click', user?.id)
       setLocalCounts(prev => ({ ...prev, clicks: prev.clicks + 1 }))
       window.open(deal.affiliate_link, '_blank', 'noopener,noreferrer')
