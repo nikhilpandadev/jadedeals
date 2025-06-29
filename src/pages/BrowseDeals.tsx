@@ -96,7 +96,11 @@ const BrowseDeals: React.FC = () => {
 
       // Apply search filter
       if (searchTerm) {
-        unexpiredQuery = unexpiredQuery.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,marketplace.ilike.%${searchTerm}%`)
+        unexpiredQuery = unexpiredQuery.textSearch(
+          'search_vector',
+          searchTerm,
+          { type: 'websearch' }
+        )
       }
 
       // Apply category filter
@@ -141,7 +145,11 @@ const BrowseDeals: React.FC = () => {
 
         // Apply same filters
         if (searchTerm) {
-          expiredQuery = expiredQuery.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,marketplace.ilike.%${searchTerm}%`)
+          expiredQuery = expiredQuery.textSearch(
+            'search_vector',
+            searchTerm,
+            { type: 'websearch' }
+          )
         }
 
         if (categoryFromUrl) {
@@ -182,34 +190,6 @@ const BrowseDeals: React.FC = () => {
       setLoading(false)
     }
   }
-
-  // const fetchPromotersDeals = async () => {
-  //   if (!user) return
-  //   setLoadingPromoterDeals(true)
-  //   const { data, error } = await getPromotersFollowedByShopper(user.id)
-  //   if (error) {
-  //     setLoadingPromoterDeals(false)
-  //     return
-  //   }
-  //   const promoterIds = data?.map((f: any) => f.promoter_id) || []
-  //   if (promoterIds.length === 0) {
-  //     setPromoterDeals([])
-  //     setLoadingPromoterDeals(false)
-  //     return
-  //   }
-  //   const { data: dealsData } = await supabase
-  //     .from('deals')
-  //     .select('*')
-  //     .in('promoter_id', promoterIds)
-  //     .order('created_at', { ascending: false })
-
-  //   setPromoterDeals(dealsData || [])
-  //   setLoadingPromoterDeals(false)
-  // }
-
-  // useEffect(() => {
-  //   if (tab === 'promoters') fetchPromotersDeals()
-  // }, [tab, user])
 
   const handleInteraction = async (dealId: string, interaction: Partial<any>) => {
     if (!user) return
@@ -392,17 +372,19 @@ const BrowseDeals: React.FC = () => {
         ) : (
           <>
             {/* Sorting Controls */}
-            <div className="flex justify-end mb-4">
-              <select
-                value={sortBy}
-                onChange={e => setSortBy(e.target.value as any)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-              >
+            {!!user && (
+              <div className="flex justify-end mb-4">
+                <select
+                  value={sortBy}
+                  onChange={e => setSortBy(e.target.value as any)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                >
                 <option value="created_at">Newest First</option>
                 <option value="expiry_date">Expiring Soon</option>
                 <option value="discount">Biggest Discount</option>
               </select>
             </div>
+    )}
 
             {/* Deals Grid */}
             <div className="flex flex-col mb-8">

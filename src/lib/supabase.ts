@@ -87,7 +87,9 @@ export interface DealComment {
   comment: string
   created_at: string
   updated_at: string
+  parent_id?: string | null // for nested replies
   user?: UserProfile
+  replies?: DealComment[] // for nested replies in UI only
 }
 
 export interface DealShare {

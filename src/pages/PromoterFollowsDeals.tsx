@@ -34,13 +34,7 @@ const PromoterFollowsDeals: React.FC = () => {
     fetchPromotersDeals();
   }, [user]);
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-gray-500">
-        Please sign in to view your followed promoters' deals.
-      </div>
-    );
-  }
+  // No access control needed: this page is for shoppers to see deals from promoters they follow
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">

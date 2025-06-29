@@ -8,7 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 const PromoterProfile = () => {
   const { username } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile: userProfile } = useAuth();
   const [profile, setProfile] = useState<any>(null);
   const [deals, setDeals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,6 +75,15 @@ const PromoterProfile = () => {
     }
     setFollowLoading(false);
   };
+
+  // Enforce access control: only allow the promoter to view their own profile
+  if (user && userProfile && userProfile.user_type === 'promoter' && userProfile.id !== profile?.id) {
+    return (
+      <div className="py-16 text-center text-red-600 font-semibold">
+        Access Denied: You are not allowed to view another promoter's profile page.
+      </div>
+    );
+  }
 
   if (loading) return <div className="py-16 text-center">Loading...</div>;
   if (!profile) return <div className="py-16 text-center">Promoter not found.</div>;

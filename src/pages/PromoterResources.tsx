@@ -608,3 +608,13 @@ const PromoterResources: React.FC = () => {
 }
 
 export default PromoterResources
+
+// Access control: Only allow logged-in promoter to access their own resources page
+// (If this page is meant to be private, add this check)
+// Example:
+// const { user, profile } = useAuth();
+// if (profile && profile.user_type === 'promoter' && user && profile.id !== user.id) {
+//   return (
+//     <div className="py-16 text-center text-red-600 font-semibold">
+//       Access Denied: You are not allowed to view another promoter's resources.
+//     </div>

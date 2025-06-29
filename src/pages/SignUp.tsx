@@ -747,8 +747,12 @@ const SignUp: React.FC = () => {
               <div className="flex items-center mb-2 font-semibold text-emerald-700">
                 Promoter Account
               </div>
-              <div className="text-gray-700 text-sm">
+              <div className="text-gray-700 text-sm mb-2">
                 Choose this if you want to share, promote, and earn commission from affiliate deals. Promoters can build a following, post deals, and access special analytics and resources.
+              </div>
+              <div className="bg-emerald-50 border border-emerald-200 rounded p-3 text-emerald-800 text-xs flex items-center gap-2 mb-2">
+                <span className="font-bold">Note:</span>
+                We never take a cut from your affiliate commissions. Your earnings are 100% yours—JadeDeals does not touch your commissions.
               </div>
             </div>
           </div>

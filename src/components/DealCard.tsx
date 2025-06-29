@@ -147,7 +147,7 @@ const DealCard: React.FC<DealCardProps> = ({
           user_id: user.id,
           is_helpful: helpfulState,
           has_used: newUsedState
-        })
+        }, { onConflict: 'deal_id,user_id' })
 
       if (error) {
         console.error('Error updating used deal:', error)
@@ -311,7 +311,7 @@ const DealCard: React.FC<DealCardProps> = ({
               <div className={`${getDiscountColor(deal.discount_percentage)} text-white px-3 py-1 rounded-full text-sm font-bold`}>
                 {deal.discount_percentage}% OFF
               </div>
-              {user && (
+              {user && showSavedStatus && (
                 <button
                   onClick={handleSaveToggle}
                   disabled={saveLoading}
@@ -321,9 +321,7 @@ const DealCard: React.FC<DealCardProps> = ({
                       : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-red-500'
                   }`}
                 >
-                  {(showSavedStatus && (
-                    isSaved ? <Heart className="h-4 w-4 fill-current" /> : <Heart className="h-4 w-4" />
-                  ))}
+                  {isSaved ? <Heart className="h-4 w-4 fill-current" /> : <Heart className="h-4 w-4" />}
                 </button>
               )}
             </div>
