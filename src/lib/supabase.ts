@@ -181,7 +181,7 @@ export const trackDealEvent = async (
       event_type: eventType,
       user_agent: navigator.userAgent
     })
-    console.log(`Tracked ${eventType} event for deal ${dealId}`, { userId, sessionId })
+    
     if (error) {
       console.error('Error tracking deal event:', error)
     }

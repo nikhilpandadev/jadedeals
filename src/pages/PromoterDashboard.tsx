@@ -31,6 +31,7 @@ import {
 import { Link } from 'react-router-dom'
 import { getUserAvatar } from '../utils/avatars'
 import { isValidImageUrl, isValidImageFile } from '../utils/imageValidation'
+import * as XLSX from 'xlsx'
 
 
 const PromoterDashboard: React.FC = () => {
@@ -68,6 +69,8 @@ const PromoterDashboard: React.FC = () => {
 
   // Add state for editing deals
   const [editDeal, setEditDeal] = useState<Deal | null>(null)
+
+  const [showBulkUpload, setShowBulkUpload] = useState(false)
 
   const ITEMS_PER_PAGE = 10
 
@@ -211,7 +214,7 @@ const PromoterDashboard: React.FC = () => {
       const [currentStats, previousStats, totals] = await Promise.all([
         fetchAnalytics(sevenDaysAgo),
         fetchAnalytics(fourteenDaysAgo, sevenDaysAgo),
-        fetchAnalytics(new Date('1970-01-01')),
+        fetchAnalytics(new Date('2025-01-01')),
       ])
 
       // Get total deals count and deals in last 7 days/previous 7 days
@@ -382,7 +385,7 @@ const PromoterDashboard: React.FC = () => {
 
     try {
       // Delete related analytics and comments for each deal
-      await supabase.from('daily_deal_analytics').delete().in('deal_id', selectedDeals)
+      await supabase.from('deal_analytics').delete().in('deal_id', selectedDeals)
       await supabase.from('deal_comments').delete().in('deal_id', selectedDeals)
       // Now delete the deals
       const { error } = await supabase
@@ -607,16 +610,41 @@ const PromoterDashboard: React.FC = () => {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-gray-900">Your Deals</h2>
-            {selectedDeals.length > 0 && (
+            <div className="flex items-center space-x-2">
               <button
-                onClick={handleBulkDelete}
-                className="bg-red-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-600 transition-colors flex items-center space-x-2"
+                onClick={() => setShowBulkUpload(true)}
+                className="bg-emerald-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-emerald-600 transition-colors flex items-center space-x-2"
               >
-                <Trash2 className="h-4 w-4" />
-                <span>Delete Selected ({selectedDeals.length})</span>
+                <Upload className="h-4 w-4" />
+                <span>Bulk Upload</span>
               </button>
-            )}
+              {selectedDeals.length > 0 && (
+                <button
+                  onClick={handleBulkDelete}
+                  className="bg-red-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-600 transition-colors flex items-center space-x-2"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Delete Selected ({selectedDeals.length})</span>
+                </button>
+              )}
+            </div>
           </div>
+
+          {/* Select All Checkbox */}
+          {deals.length > 0 && (
+            <div className="flex items-center mb-2">
+              <input
+                type="checkbox"
+                checked={selectedDeals.length === deals.length}
+                onChange={e => {
+                  if (e.target.checked) setSelectedDeals(deals.map(d => d.id))
+                  else setSelectedDeals([])
+                }}
+                className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 mr-2"
+              />
+              <span className="text-sm text-gray-700">Select All</span>
+            </div>
+          )}
 
           {/* Filters and Search */}
           <div className="flex flex-col sm:flex-row gap-4 mb-6">
@@ -744,7 +772,7 @@ const PromoterDashboard: React.FC = () => {
                 onClick={async () => {
                   try {
                     // Delete related analytics and comments for this deal
-                    await supabase.from('daily_deal_analytics').delete().eq('deal_id', confirmDeleteId)
+                    await supabase.from('deal_analytics').delete().eq('deal_id', confirmDeleteId)
                     await supabase.from('deal_comments').delete().eq('deal_id', confirmDeleteId)
                     // Now delete the deal
                     await supabase.from('deals').delete().eq('id', confirmDeleteId)
@@ -772,6 +800,18 @@ const PromoterDashboard: React.FC = () => {
           onClose={() => setEditDeal(null)}
           onSuccess={() => {
             setEditDeal(null)
+            fetchDeals(0, true)
+            fetchStats()
+          }}
+        />
+      )}
+
+      {/* Bulk Upload Modal */}
+      {showBulkUpload && (
+        <BulkUploadModal
+          onClose={() => setShowBulkUpload(false)}
+          onSuccess={() => {
+            setShowBulkUpload(false)
             fetchDeals(0, true)
             fetchStats()
           }}
@@ -1848,6 +1888,218 @@ const CommentsModal: React.FC<{
               </div>
             </>
           )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Bulk Upload Modal Component
+const BulkUploadModal: React.FC<{
+  onClose: () => void
+  onSuccess: () => void
+}> = ({ onClose, onSuccess }) => {
+  const { user, profile } = useAuth()
+  const [file, setFile] = useState<File | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [rowErrors, setRowErrors] = useState<string[]>([])
+
+  const requiredFields = [
+    'title', 'description', 'category', 'marketplace',
+    'retail_price', 'current_price', 'affiliate_link', 'expiry_date'
+  ]
+
+  // Map Excel headers to internal field names
+  const headerMap: Record<string, string> = {
+    'Product Name': 'title',
+    'Description': 'description',
+    'Category': 'category',
+    'Marketplace': 'marketplace',
+    'Retail Price': 'retail_price',
+    'Sale Price': 'current_price',
+    'Affiliate Link': 'affiliate_link',
+    'Expiry Date': 'expiry_date',
+    'Coupon Code': 'coupon_code',
+    'Image Url': 'image_url'
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFile(e.target.files?.[0] || null)
+    setError('')
+    setSuccess('')
+    setRowErrors([])
+  }
+
+  const validateRow = (row: any, idx: number) => {
+    const errors: string[] = []
+    requiredFields.forEach(field => {
+      if (!row[field] || row[field].toString().trim() === '') {
+        errors.push(`Row ${idx + 2}: Missing required field '${field}'`)
+      }
+    })
+    // Validate price fields
+    if (row.retail_price && isNaN(Number(row.retail_price))) {
+      errors.push(`Row ${idx + 2}: 'retail_price' must be a number`)
+    }
+    if (row.current_price && (isNaN(Number(row.current_price)) || Number(row.current_price) < 0)) {
+      errors.push(`Row ${idx + 2}: 'current_price' must be a non-negative number`)
+    }
+    // New: retail_price must be greater than current_price
+    if (
+      row.retail_price && row.current_price &&
+      !isNaN(Number(row.retail_price)) && !isNaN(Number(row.current_price)) &&
+      Number(row.retail_price) <= Number(row.current_price)
+    ) {
+      errors.push(`Row ${idx + 2}: 'retail_price' must be greater than 'current_price'`)
+    }
+    // Validate expiry_date (should be a valid date)
+    if (row.expiry_date && isNaN(Date.parse(row.expiry_date))) {
+      errors.push(`Row ${idx + 2}: 'expiry_date' must be a valid date`)
+    }
+    // Validate image_url if present
+    if (row.image_url && row.image_url.trim() !== '' && !/^https:\/\/.+\.(jpg|jpeg|png)$/i.test(row.image_url)) {
+      errors.push(`Row ${idx + 2}: 'image_url' must be https and end with .jpg, .jpeg, or .png`)
+    }
+    // Validate affiliate_link
+    if (row.affiliate_link && !/^https?:\/\//.test(row.affiliate_link)) {
+      errors.push(`Row ${idx + 2}: 'affiliate_link' must be a valid URL`)
+    }
+    return errors
+  }
+
+  const handleUpload = async () => {
+    if (!file || !user || !profile) return
+    setLoading(true)
+    setError('')
+    setSuccess('')
+    setRowErrors([])
+    try {
+      const data = await file.arrayBuffer()
+      const workbook = XLSX.read(data)
+      const sheet = workbook.Sheets[workbook.SheetNames[0]]
+      let rows: any[] = XLSX.utils.sheet_to_json(sheet, { raw: false, defval: '' })
+      if (!rows.length) {
+        setError('No records found in the file.')
+        setLoading(false)
+        return
+      }
+      // Map headers for each row
+      rows = rows.map(row => {
+        const mapped: any = {}
+        Object.entries(headerMap).forEach(([excelKey, fieldKey]) => {
+          mapped[fieldKey] = row[excelKey] ?? ''
+        })
+        return mapped
+      })
+      const errors: string[] = []
+      const validDeals: any[] = []
+      rows.forEach((row, idx) => {
+        const rowErrs = validateRow(row, idx)
+        if (rowErrs.length) {
+          errors.push(...rowErrs)
+        } else {
+          // Prepare deal object
+          const retailPrice = parseFloat(row.retail_price)
+          const currentPrice = parseFloat(row.current_price)
+          const discountPercentage = Math.round(((retailPrice - currentPrice) / retailPrice) * 100)
+            // Convert expiry_date to ISO string (timestamp format for Supabase)
+            let expiryDateValue = row.expiry_date
+            if (expiryDateValue && !/T/.test(expiryDateValue)) {
+            // If only date is provided (e.g., "2024-06-01"), add time
+            expiryDateValue = new Date(expiryDateValue).toISOString()
+            } else if (expiryDateValue) {
+            // If datetime-local format (e.g., "2024-06-01T23:59"), convert to ISO
+            expiryDateValue = new Date(expiryDateValue).toISOString()
+            }
+            validDeals.push({
+            title: row.title,
+            description: row.description,
+            coupon_code: row.coupon_code || null,
+            retail_price: retailPrice,
+            current_price: currentPrice,
+            discount_percentage: discountPercentage,
+            category: row.category,
+            marketplace: row.marketplace,
+            promoter_id: user.id,
+            promoter_username: profile.username,
+            affiliate_link: row.affiliate_link,
+            expiry_date: expiryDateValue,
+            image_url: row.image_url || null
+            })
+        }
+      })
+      if (validDeals.length) {
+        const { error: insertError } = await supabase.from('deals').insert(validDeals)
+        if (insertError) {
+          setError('Some error occurred while inserting valid deals.')
+        } else {
+          setSuccess(`${validDeals.length} deals uploaded successfully!`)
+        }
+      }
+      setRowErrors(errors)
+      setLoading(false)
+      if (validDeals.length) onSuccess()
+    } catch (e: any) {
+      setError('Failed to process the file. Please ensure it is a valid Excel file.')
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">Bulk Upload Deals</h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+          <div className="mb-4">
+            <a
+              href="/public/bulk_deals_template.xlsx"
+              download
+              className="text-emerald-600 hover:underline"
+            >
+              Download Excel Template
+            </a>
+          </div>
+          <div className="mb-4 text-sm text-gray-700">
+            Please use the provided template. Required columns: <b>title, description, category, marketplace, retail_price, current_price, affiliate_link, expiry_date</b>.<br/>
+            Optional: coupon_code, image_url
+          </div>
+          <input type="file" accept=".xlsx,.xls" className="mb-4" onChange={handleFileChange} />
+          {error && <div className="mb-2 text-red-600 text-sm">{error}</div>}
+          {success && <div className="mb-2 text-green-600 text-sm">{success}</div>}
+          {rowErrors.length > 0 && (
+            <div className="mb-2 text-red-600 text-sm max-h-40 overflow-y-auto border border-red-200 rounded p-2">
+              <b>Some records could not be processed:</b>
+              <ul className="list-disc ml-5">
+                {rowErrors.map((err, i) => <li key={i}>{err}</li>)}
+              </ul>
+            </div>
+          )}
+          <div className="flex justify-end space-x-4 mt-4">
+            <button
+              onClick={onClose}
+              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+              disabled={loading}
+            >
+              Cancel
+            </button>
+            <button
+              className="px-6 py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg font-semibold hover:shadow-lg transition-all duration-200 disabled:opacity-50"
+              onClick={handleUpload}
+              disabled={!file || loading}
+            >
+              {loading ? 'Uploading...' : 'Upload'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

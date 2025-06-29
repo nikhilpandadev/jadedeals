@@ -172,7 +172,7 @@ const BrowseDeals: React.FC = () => {
           dealsToUse = [...dealsToUse, ...(expiredDeals || [])]
         }
       }
-      console.log('Fetched deals:', dealsToUse)
+      
       const processedDeals = dealsToUse?.map(deal => ({
         ...deal,
         helpful_count: deal.interactions?.filter((i: any) => i.is_helpful === true).length || 0,
