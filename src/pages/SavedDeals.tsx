@@ -14,7 +14,10 @@ const SavedDeals: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('')
   const [sortBy, setSortBy] = useState('created_at')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-  const [page, setPage] = useState(0)
+  // Paging state
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  const [totalDeals, setTotalDeals] = useState(0)
   const [selectedDeals, setSelectedDeals] = useState<string[]>([])
 
   const ITEMS_PER_PAGE = 12
@@ -25,11 +28,10 @@ const SavedDeals: React.FC = () => {
     'Travel', 'Automotive', 'Toys & Games'
   ]
 
-  const fetchSavedDeals = useCallback(async (pageNum: number = 0, reset: boolean = false) => {
+  const fetchSavedDeals = useCallback(async (pageNum: number = 1, reset: boolean = false) => {
     if (!user) return
-
     try {
-      if (pageNum === 0) setLoading(true)
+      if (pageNum === 1) setLoading(true)
       else setLoadingMore(true)
 
       let query = supabase
@@ -43,7 +45,7 @@ const SavedDeals: React.FC = () => {
             comments:deal_comments(id),
             user_interaction:deal_interactions!left(is_helpful, has_used)
           )
-        `)
+        `, { count: 'exact' })
         .eq('user_id', user.id)
         .eq('deals.user_interaction.user_id', user.id)
 
@@ -64,13 +66,14 @@ const SavedDeals: React.FC = () => {
       }
 
       // Apply pagination
-      const from = pageNum * ITEMS_PER_PAGE
-      const to = from + ITEMS_PER_PAGE - 1
+      const from = (pageNum - 1) * pageSize
+      const to = from + pageSize - 1
       query = query.range(from, to)
 
-      const { data, error } = await query
+      const { data, error, count } = await query
 
       if (error) throw error
+      setTotalDeals(count || 0)
 
       // Fetch promoter profiles
       const dealIds = data?.map(item => item.deals.promoter_id).filter(Boolean) || []
@@ -104,22 +107,14 @@ const SavedDeals: React.FC = () => {
       setLoading(false)
       setLoadingMore(false)
     }
-  }, [user, searchTerm, selectedCategory, sortBy, sortOrder])
+  }, [user, searchTerm, selectedCategory, sortBy, sortOrder, pageSize])
 
   useEffect(() => {
     if (user) {
-      setPage(0)
-      fetchSavedDeals(0, true)
+      setPage(1)
+      fetchSavedDeals(1, true)
     }
-  }, [fetchSavedDeals, user])
-
-  const handleLoadMore = () => {
-    if (!loadingMore && hasMore) {
-      const nextPage = page + 1
-      setPage(nextPage)
-      fetchSavedDeals(nextPage)
-    }
-  }
+  }, [fetchSavedDeals, user, pageSize])
 
   const handleInteraction = async (dealId: string, interaction: Partial<DealInteraction>) => {
     if (!user) return
@@ -214,13 +209,13 @@ const SavedDeals: React.FC = () => {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
-    setPage(0)
-    fetchSavedDeals(0, true)
+    setPage(1)
+    fetchSavedDeals(1, true)
   }
 
   const handleFilterChange = (category: string) => {
     setSelectedCategory(category === selectedCategory ? '' : category)
-    setPage(0)
+    setPage(1)
   }
 
   const handleSortChange = (newSortBy: string) => {
@@ -230,7 +225,7 @@ const SavedDeals: React.FC = () => {
       setSortBy(newSortBy)
       setSortOrder('desc')
     }
-    setPage(0)
+    setPage(1)
   }
 
   const toggleDealSelection = (dealId: string) => {
@@ -377,6 +372,78 @@ const SavedDeals: React.FC = () => {
         </div>
 
         {/* Deals Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          {deals.map(deal => (
+            <div key={deal.id} className="relative">
+              {/* Selection Checkbox */}
+              <div className="absolute top-4 left-4 z-10">
+                <input
+                  type="checkbox"
+                  checked={selectedDeals.includes(deal.id)}
+                  onChange={() => toggleDealSelection(deal.id)}
+                  className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 bg-white shadow-sm"
+                />
+              </div>
+              
+              {/* Unsave Button */}
+              <div className="absolute top-4 right-4 z-10">
+                <button
+                  onClick={() => handleUnsave(deal.id)}
+                  className="p-2 bg-white rounded-full shadow-sm hover:bg-red-50 hover:text-red-600 transition-colors"
+                  title="Remove from saved"
+                >
+                  <Heart className="h-4 w-4 fill-current text-red-500" />
+                </button>
+              </div>
+
+              <DealCard
+                deal={deal}
+                onInteraction={handleInteraction}
+                onComment={handleComment}
+                onShare={handleShare}
+                showSavedStatus={false}
+                showPromoter={true}
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* Paging Controls */}
+        {deals.length > 0 && (
+          <div className="flex flex-col md:flex-row items-center justify-between mb-6 gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">Page Size:</span>
+              <select
+                value={pageSize}
+                onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }}
+                className="px-2 py-1 border border-gray-300 rounded"
+              >
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => { if (page > 1) { setPage(page - 1); fetchSavedDeals(page - 1, true) } }}
+                disabled={page === 1}
+                className="px-3 py-1 rounded border border-gray-300 bg-white text-gray-700 disabled:opacity-50"
+              >
+                Prev
+              </button>
+              <span className="text-sm text-gray-600">Page {page} of {Math.ceil(totalDeals / pageSize) || 1}</span>
+              <button
+                onClick={() => { if (page * pageSize < totalDeals) { setPage(page + 1); fetchSavedDeals(page + 1, true) } }}
+                disabled={page * pageSize >= totalDeals}
+                className="px-3 py-1 rounded border border-gray-300 bg-white text-gray-700 disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* No Deals Message */}
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
@@ -399,81 +466,23 @@ const SavedDeals: React.FC = () => {
             </a>
           </div>
         ) : (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-              {deals.map(deal => (
-                <div key={deal.id} className="relative">
-                  {/* Selection Checkbox */}
-                  <div className="absolute top-4 left-4 z-10">
-                    <input
-                      type="checkbox"
-                      checked={selectedDeals.includes(deal.id)}
-                      onChange={() => toggleDealSelection(deal.id)}
-                      className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 bg-white shadow-sm"
-                    />
-                  </div>
-                  
-                  {/* Unsave Button */}
-                  <div className="absolute top-4 right-4 z-10">
-                    <button
-                      onClick={() => handleUnsave(deal.id)}
-                      className="p-2 bg-white rounded-full shadow-sm hover:bg-red-50 hover:text-red-600 transition-colors"
-                      title="Remove from saved"
-                    >
-                      <Heart className="h-4 w-4 fill-current text-red-500" />
-                    </button>
-                  </div>
-
-                  <DealCard
-                    deal={deal}
-                    onInteraction={handleInteraction}
-                    onComment={handleComment}
-                    onShare={handleShare}
-                    showSavedStatus={false}
-                    showPromoter={true}
-                  />
-                </div>
-              ))}
-            </div>
-
-            {/* Load More */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
             <div className="text-center">
-              {hasMore ? (
-                <button
-                  onClick={handleLoadMore}
-                  disabled={loadingMore}
-                  className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-8 py-3 rounded-lg font-semibold hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 mx-auto"
-                >
-                  {loadingMore ? (
-                    <>
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      <span>Loading...</span>
-                    </>
-                  ) : (
-                    <span>Load More Deals</span>
-                  )}
-                </button>
-              ) : deals.length > 0 && (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
-                  <div className="text-center">
-                    <div className="text-4xl mb-4">💎</div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                      You've seen all your saved deals!
-                    </h3>
-                    <p className="text-gray-600 mb-4">
-                      Discover more amazing deals to add to your collection.
-                    </p>
-                    <a
-                      href="/browse-deals"
-                      className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 inline-block"
-                    >
-                      Browse More Deals
-                    </a>
-                  </div>
-                </div>
-              )}
+              <div className="text-4xl mb-4">💎</div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                You've seen all your saved deals!
+              </h3>
+              <p className="text-gray-600 mb-4">
+                Discover more amazing deals to add to your collection.
+              </p>
+              <a
+                href="/browse-deals"
+                className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 inline-block"
+              >
+                Browse More Deals
+              </a>
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>

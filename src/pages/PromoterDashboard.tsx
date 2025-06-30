@@ -45,7 +45,10 @@ const PromoterDashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'expired'>('all')
   const [sortBy, setSortBy] = useState<'created_at' | 'expiry_date' | 'performance'>('created_at')
-  const [page, setPage] = useState(0)
+  // Paging state
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  const [totalDeals, setTotalDeals] = useState(0)
   const [hasMore, setHasMore] = useState(true)
   const [showCommentsModal, setShowCommentsModal] = useState<null | string>(null) // dealId or null
 
@@ -72,12 +75,10 @@ const PromoterDashboard: React.FC = () => {
 
   const [showBulkUpload, setShowBulkUpload] = useState(false)
 
-  const ITEMS_PER_PAGE = 10
-
   useEffect(() => {
     if (user && profile?.user_type === 'promoter') {
       fetchStats()
-      fetchDeals(0, true)
+      fetchDeals(1, true)
       loadPromoterProfile()
       fetchFollowers();
     }
@@ -86,10 +87,11 @@ const PromoterDashboard: React.FC = () => {
   // Ensure deals are refetched when filters or sorting change
   useEffect(() => {
     if (user && profile?.user_type === 'promoter') {
-      fetchDeals(0, true)
+      setPage(1)
+      fetchDeals(1, true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, filterStatus, sortBy])
+  }, [searchTerm, filterStatus, sortBy, pageSize])
 
   const loadPromoterProfile = async () => {
     if (!user) return
@@ -257,15 +259,15 @@ const PromoterDashboard: React.FC = () => {
     }
   }
 
-  const fetchDeals = useCallback(async (pageNum: number = 0, reset: boolean = false) => {
+  const fetchDeals = useCallback(async (pageNum: number = 1, reset: boolean = false) => {
     if (!user) return
 
     try {
-      if (pageNum === 0) setLoading(true)
+      if (pageNum === 1) setLoading(true)
 
       let query = supabase
         .from('deals')
-        .select('*')
+        .select('*', { count: 'exact' })
         .eq('promoter_id', user.id)
         .eq('promoter_username', profile?.username) // NEW: filter by username
 
@@ -288,13 +290,14 @@ const PromoterDashboard: React.FC = () => {
       }
 
       // Apply pagination
-      const from = pageNum * ITEMS_PER_PAGE
-      const to = from + ITEMS_PER_PAGE - 1
+      const from = (pageNum - 1) * pageSize
+      const to = from + pageSize - 1
       query = query.range(from, to)
 
-      const { data, error } = await query
+      const { data, error, count } = await query
 
       if (error) throw error
+      setTotalDeals(count || 0)
 
       // Fetch real stats from deal_analytics for these deals
       const dealIds = (data || []).map(deal => deal.id)
@@ -342,19 +345,19 @@ const PromoterDashboard: React.FC = () => {
         comment_count: analyticsMap[deal.id]?.comment_count || 0
       }))
 
-      if (reset || pageNum === 0) {
+      if (reset || pageNum === 1) {
         setDeals(processedDeals)
       } else {
         setDeals(prev => [...prev, ...processedDeals])
       }
 
-      setHasMore(processedDeals.length === ITEMS_PER_PAGE)
+      setHasMore((from + processedDeals.length) < (count || 0))
     } catch (error) {
       console.error('Error fetching deals:', error)
     } finally {
       setLoading(false)
     }
-  }, [user, searchTerm, filterStatus, sortBy])
+  }, [user, searchTerm, filterStatus, sortBy, pageSize, profile?.username])
 
   const fetchFollowers = async () => {
     if (!user) return;
@@ -374,12 +377,6 @@ const PromoterDashboard: React.FC = () => {
     fetchFollowers();
   };
 
-  const handleLoadMore = () => {
-    const nextPage = page + 1
-    setPage(nextPage)
-    fetchDeals(nextPage)
-  }
-
   const handleBulkDelete = async () => {
     if (!selectedDeals.length) return
 
@@ -396,7 +393,7 @@ const PromoterDashboard: React.FC = () => {
       if (error) throw error
 
       setSelectedDeals([])
-      fetchDeals(0, true)
+      fetchDeals(1, true)
       fetchStats()
     } catch (error) {
       console.error('Error deleting deals:', error)
@@ -680,6 +677,41 @@ const PromoterDashboard: React.FC = () => {
             </select>
           </div>
 
+          {/* Paging Controls */}
+          {deals.length > 0 && (
+            <div className="flex flex-col md:flex-row items-center justify-between mb-6 gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">Page Size:</span>
+                <select
+                  value={pageSize}
+                  onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }}
+                  className="px-2 py-1 border border-gray-300 rounded"
+                >
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { if (page > 1) { setPage(page - 1); fetchDeals(page - 1, true) } }}
+                  disabled={page === 1}
+                  className="px-3 py-1 rounded border border-gray-300 bg-white text-gray-700 disabled:opacity-50"
+                >
+                  Prev
+                </button>
+                <span className="text-sm text-gray-600">Page {page} of {Math.ceil(totalDeals / pageSize) || 1}</span>
+                <button
+                  onClick={() => { if (page * pageSize < totalDeals) { setPage(page + 1); fetchDeals(page + 1, true) } }}
+                  disabled={page * pageSize >= totalDeals}
+                  className="px-3 py-1 rounded border border-gray-300 bg-white text-gray-700 disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Deals List */}
           {loading ? (
             <div className="flex items-center justify-center py-12">
@@ -707,17 +739,6 @@ const PromoterDashboard: React.FC = () => {
                   />
                 ))}
               </div>
-
-              {hasMore && (
-                <div className="text-center mt-6">
-                  <button
-                    onClick={handleLoadMore}
-                    className="bg-gray-100 text-gray-700 px-6 py-2 rounded-lg font-medium hover:bg-gray-200 transition-colors"
-                  >
-                    Load More
-                  </button>
-                </div>
-              )}
             </>
           )}
         </div>
@@ -729,7 +750,7 @@ const PromoterDashboard: React.FC = () => {
           onClose={() => setShowCreateDeal(false)}
           onSuccess={() => {
             setShowCreateDeal(false)
-            fetchDeals(0, true)
+            fetchDeals(1, true)
             fetchStats()
           }}
         />
@@ -777,7 +798,7 @@ const PromoterDashboard: React.FC = () => {
                     // Now delete the deal
                     await supabase.from('deals').delete().eq('id', confirmDeleteId)
                     setConfirmDeleteId(null)
-                    fetchDeals(0, true)
+                    fetchDeals(1, true)
                     fetchStats()
                   } catch (error) {
                     console.error('Error deleting deal:', error)
@@ -800,7 +821,7 @@ const PromoterDashboard: React.FC = () => {
           onClose={() => setEditDeal(null)}
           onSuccess={() => {
             setEditDeal(null)
-            fetchDeals(0, true)
+            fetchDeals(1, true)
             fetchStats()
           }}
         />
@@ -812,7 +833,7 @@ const PromoterDashboard: React.FC = () => {
           onClose={() => setShowBulkUpload(false)}
           onSuccess={() => {
             setShowBulkUpload(false)
-            fetchDeals(0, true)
+            fetchDeals(1, true)
             fetchStats()
           }}
         />
@@ -1696,7 +1717,7 @@ const EditDealModal: React.FC<{
                 disabled={loading}
                 className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-lg font-semibold hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? 'Saving...' : 'Edit Deal'}
+                {loading ? 'Creating...' : 'Create Deal'}
               </button>
             </div>
           </form>
@@ -1741,7 +1762,7 @@ const CommentsModal: React.FC<{
           if (profilesError) throw profilesError
           profilesMap = Object.fromEntries((profilesData || []).map((p: any) => [p.id, p.username]))
         }
-        // Attach username to each comment
+               // Attach username to each comment
         const commentsWithUsernames = (commentsData || []).map((c: any) => ({
           ...c,
           username: profilesMap[c.user_id] || c.user_id
