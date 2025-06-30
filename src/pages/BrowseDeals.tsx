@@ -24,6 +24,10 @@ const BrowseDeals: React.FC = () => {
   // Shopper-side sorting state
   const [sortBy, setSortBy] = useState<'created_at' | 'expiry_date' | 'discount'>('created_at')
 
+  // Paging state
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+
   // Redirect promoters away from this page
   useEffect(() => {
     if (profile?.user_type === 'promoter') {
@@ -37,7 +41,8 @@ const BrowseDeals: React.FC = () => {
     if (profile?.user_type !== 'promoter') {
       fetchDeals()
     }
-  }, [searchTerm, categoryFromUrl, timeFilter, profile])
+    // eslint-disable-next-line
+  }, [searchTerm, categoryFromUrl, timeFilter, profile, page, pageSize])
 
   // Add sorting effect for deals
   useEffect(() => {
@@ -58,7 +63,6 @@ const BrowseDeals: React.FC = () => {
   const fetchDeals = async () => {
     try {
       setLoading(true)
-      
       // Calculate time filter date
       let timeFilterDate = null
       if (timeFilter) {
@@ -76,6 +80,10 @@ const BrowseDeals: React.FC = () => {
         }
       }
 
+      // Calculate range for pagination
+      const from = (page - 1) * pageSize
+      const to = from + pageSize - 1
+
       // First, try to get unexpired deals
       let unexpiredQuery = supabase
         .from('deals')
@@ -85,7 +93,7 @@ const BrowseDeals: React.FC = () => {
           comments:deal_comments(id),
           user_interaction:deal_interactions!left(is_helpful, has_used),
           user_saved:deal_saves!left(id)
-        `)
+        `, { count: 'exact' })
         .gt('expiry_date', new Date().toISOString()) // Only unexpired deals
 
       // Filter user interactions for the current user
@@ -113,9 +121,9 @@ const BrowseDeals: React.FC = () => {
         unexpiredQuery = unexpiredQuery.gte('created_at', timeFilterDate.toISOString())
       }
 
-      unexpiredQuery = unexpiredQuery.order('created_at', { ascending: false }).limit(20)
+      unexpiredQuery = unexpiredQuery.order('created_at', { ascending: false }).range(from, to)
 
-      const { data: unexpiredDeals, error: unexpiredError } = await unexpiredQuery
+      const { data: unexpiredDeals, error: unexpiredError, count: unexpiredCount } = await unexpiredQuery
 
       if (unexpiredError) {
         console.error('Error fetching unexpired deals:', unexpiredError)
@@ -123,9 +131,10 @@ const BrowseDeals: React.FC = () => {
       }
 
       let dealsToUse = unexpiredDeals || []
+      let totalCount = unexpiredCount || 0
 
-      // If we don't have enough unexpired deals (less than 20), fetch some expired ones to fill the gap
-      if (dealsToUse.length < 20) {
+      // If we don't have enough unexpired deals (less than pageSize), fetch some expired ones to fill the gap
+      if (dealsToUse.length < pageSize) {
         let expiredQuery = supabase
           .from('deals')
           .select(`
@@ -160,7 +169,7 @@ const BrowseDeals: React.FC = () => {
           expiredQuery = expiredQuery.gte('created_at', timeFilterDate.toISOString())
         }
 
-        expiredQuery = expiredQuery.order('created_at', { ascending: false }).limit(20 - dealsToUse.length)
+        expiredQuery = expiredQuery.order('created_at', { ascending: false }).range(0, pageSize - dealsToUse.length - 1)
 
         const { data: expiredDeals, error: expiredError } = await expiredQuery
 
@@ -183,6 +192,8 @@ const BrowseDeals: React.FC = () => {
       })) || []
 
       setDeals(processedDeals)
+      // Save totalCount for pagination controls
+      setTotalDeals(totalCount)
     } catch (error) {
       console.error('Error fetching deals:', error)
       setDeals([]) // Set empty array on error
@@ -190,6 +201,9 @@ const BrowseDeals: React.FC = () => {
       setLoading(false)
     }
   }
+
+  // Track total deals for pagination
+  const [totalDeals, setTotalDeals] = useState(0)
 
   const handleInteraction = async (dealId: string, interaction: Partial<any>) => {
     if (!user) return
@@ -273,7 +287,7 @@ const BrowseDeals: React.FC = () => {
 
   // Determine which deals to show based on authentication
   const visibleDeals = user ? deals : deals.slice(0, FREE_DEALS_LIMIT)
-  const hasMoreDeals = deals.length > FREE_DEALS_LIMIT
+  const hasMoreDeals = totalDeals > FREE_DEALS_LIMIT
 
   if (loading) {
     return (
@@ -385,6 +399,41 @@ const BrowseDeals: React.FC = () => {
               </select>
             </div>
     )}
+
+            {/* Paging Controls */}
+            {deals.length > 0 && (
+          <div className="flex flex-col md:flex-row items-center justify-between mb-6 gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">Page Size:</span>
+              <select
+                value={pageSize}
+                onChange={e => { setPageSize(Number(e.target.value)); setPage(1) }}
+                className="px-2 py-1 border border-gray-300 rounded"
+              >
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-3 py-1 rounded border border-gray-300 bg-white text-gray-700 disabled:opacity-50"
+              >
+                Prev
+              </button>
+              <span className="text-sm text-gray-600">Page {page} of {Math.ceil(totalDeals / pageSize) || 1}</span>
+              <button
+                onClick={() => setPage(p => p + 1)}
+                disabled={page * pageSize >= totalDeals}
+                className="px-3 py-1 rounded border border-gray-300 bg-white text-gray-700 disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
 
             {/* Deals Grid */}
             <div className="flex flex-col mb-8">
